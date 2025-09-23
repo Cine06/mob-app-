@@ -1,0 +1,412 @@
+.dashboard-container {
+    display: flex;
+    height: 100vh;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f5f5f5;
+    margin-left: 250px;
+    transition: margin-left 0.3s ease;
+  }
+  
+  .main-content {
+    flex: 1;
+    padding: 24px;
+    margin-left: 0;
+    overflow-y: auto;
+    transition: margin-left 0.3s ease;
+  }
+  
+  .dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    position: relative; /* Ensure header is above the grid for search results dropdown */
+    z-index: 20;      /* A higher z-index to keep it on top */
+  }
+  
+  .dashboard-title h1 {
+    font-size: 30px;
+    color: #05642d;
+    margin: 0;
+    font-weight: 700;
+  }
+  
+  .highlight {
+    color: #05642d;
+  }
+  
+  .search-profile {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: relative;
+  }
+
+  .search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #9ca3af; /* A neutral gray */
+    pointer-events: none;
+  }
+
+  .search-container {
+    position: relative;
+  }
+  
+  .search-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    background-color: white;
+    border: 1px solid #ddd;
+    border-top: none;
+    border-radius: 0 0 10px 10px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    z-index: 10;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+  
+  .search-result-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  
+  .search-result-item:last-child {
+    border-bottom: none;
+  }
+  
+  .search-result-item:hover {
+    background-color: #f9fafb;
+  }
+  
+  .search-result-type {
+    font-size: 0.8em;
+    color: #666;
+    background-color: #e9ecef;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+  .profile {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: transform 0.2s;
+  }
+
+  .profile:hover {
+    transform: scale(1.02);
+  }
+  
+  
+  .search-bar {
+    padding: 8px 12px 8px 36px; /* Added left padding for icon */
+    border: 1px solid #d1d5db; /* Slightly lighter border */
+    border-radius: 10px;
+    outline: none;
+    width: 250px;
+    font-size: 14px;
+    background-color: white;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .search-bar:focus {
+    border-color: #05642d;
+    box-shadow: 0 0 0 3px rgba(5, 100, 45, 0.1);
+  }
+  
+  .profile-pic {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid #05642d;
+    transition: box-shadow 0.3s ease;
+  }
+  
+  .profile-pic:hover {
+    box-shadow: 0 0 0 4px rgba(5, 100, 45, 0.2);
+  }
+  
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+  }
+  
+  .card {
+    border-radius: 16px;
+    padding: 20px;
+    background-color: #ffffff;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  
+  .card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+  }
+  
+  .yellow {
+    border-left: 6px solid #ffa500;
+  }
+  
+  .green-title {
+    background-color: #05642d;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-weight: 600;
+    display: inline-block;
+    margin-bottom: 12px;
+    font-size: 15px;
+  }
+  
+  .entry {
+    background-color: #e6f4ea;
+    color: #05642d;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    border-radius: 8px;
+    font-weight: 500;
+    font-size: 14px;
+  }
+  
+  .schedule-card {
+    display: flex;
+    flex-direction: column;
+    max-height: 400px;
+  }
+
+  .schedule-list {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding-right: 5px; /* Space for scrollbar */
+  }
+
+  .schedule-date-group {
+    margin-bottom: 1.25rem;
+  }
+
+  .schedule-date-header {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #555;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #f0f0f0;
+    margin-bottom: 0.75rem;
+  }
+
+  .tasks-for-day-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .task {
+    padding: 0.6rem 0.8rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    border-left: 5px solid transparent;
+  }
+
+  .task:hover {
+    transform: translateX(4px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+    background-color: #f9fafb; /* Lighter background on hover for better feedback */
+  }
+
+  .task-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #333;
+    margin-bottom: 2px;
+  }
+
+  .task-description {
+    font-size: 0.8rem;
+    color: #666;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Type-specific styling */
+  .task.reminder {
+    background-color: #fefce8; /* Lighter yellow */
+    border-left-color: #facc15; /* Yellow-400 */
+  }
+  .task.reminder .task-title { color: #713f12; }
+  .task.reminder .task-description { color: #a16207; }
+
+  .task.assessment {
+    background-color: #eff6ff; /* Lighter blue */
+    border-left-color: #60a5fa; /* Blue-400 */
+  }
+  .task.assessment .task-title { color: #1e40af; }
+  .task.assessment .task-description { color: #1d4ed8; }
+
+  .profile-name {
+    font-weight: 600;
+    color: #05642d;
+    font-size: 15px;
+  }
+  
+  @media (max-width: 768px) {
+    .dashboard-container {
+      margin-left: 0;
+    }
+    .profile-name {
+      display: none;
+    }
+    .main-content {
+      margin-left: 0;
+      padding: 16px;
+    }
+  
+    .search-bar {
+      width: 100%;
+    }
+  
+    .card {
+      padding: 16px;
+    }
+  
+    .profile-pic {
+      width: 36px;
+      height: 36px;
+    }
+  }
+  
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.fade-in {
+  animation: fadeIn 0.6s ease forwards;
+}
+
+.slide-down {
+  animation: slideDown 0.6s ease forwards;
+}
+
+.fade-in-up {
+  animation: fadeInUp 0.6s ease forwards;
+}
+
+.pulse {
+  animation: pulse 2s infinite ease-in-out;
+}
+.clickable-notification {
+  cursor: pointer;
+}
+
+.clickable-notification:hover {
+  background-color: #f0f0f0; /* Or any other hover effect you prefer */
+}
+
+.notification-timestamp-message {
+  font-size: 0.8em; /* Makes the font smaller */
+  color: #555;     /* A slightly lighter color, adjust as needed */
+  margin-top: 3px;  /* Adds a small space below the title */
+  display: block;   /* Ensures it takes its own line */
+}
+
+/* Add these new styles to your TeacherDashboard.css */
+
+.leaderboard-card {
+  display: flex;
+  flex-direction: column;
+  max-height: 400px; /* Set a max height to prevent it from getting too tall */
+}
+
+.leaderboard-header {
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.section-filter {
+  padding: 5px 5px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  background-color: #fff;
+  font-size: 0.9rem;
+}
+
+.leaderboard-list {
+  flex-grow: 1;
+  overflow-y: auto;
+  font-size: 12px;
+}
+
+.leaderboard-entry {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  background-color: #e6f4ea;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.leaderboard-entry:hover {
+  background-color: #d1fae5;
+}
+
+.leaderboard-entry .rank {
+  font-weight: 700;
+  color: #05642d;
+  min-width: 20px;
+}
+
+.leaderboard-entry .student-name {
+  font-weight: 600;
+  color: #065f46;
+}
+
+.leaderboard-entry .student-section {
+  font-size: 0.85rem;
+  color: #047857;
+}
+
+.leaderboard-entry .percentage-line {
+  color: #05642d;
+  opacity: 0.6;
+}
+
+.leaderboard-entry .percentage {
+  font-weight: bold;
+  color: #05642d;
+}
+
+.leaderboard-entry .awards {
+  margin-left: auto;
+  font-size: 1.2rem;
+}

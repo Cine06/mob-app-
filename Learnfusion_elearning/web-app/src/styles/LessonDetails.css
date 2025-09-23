@@ -1,0 +1,53 @@
+.lesson-details-layout {
+  display: flex;
+  height: 100vh;
+}
+
+.lesson-details-content {
+  flex: 1;
+  padding: 2rem;
+  overflow-y: auto;
+}
+
+.back-button {
+  background-color: #4f46e5;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.3s ease;
+}
+
+.back-button:hover {
+  background-color: #3730a3;
+}
+
+.lesson-container {
+    margin-left: 250px;
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+}
+
+.lesson-title {
+  font-size: 24px;
+  margin-bottom: 1rem;
+  color: #1f2937;
+}
+
+.video-container,
+.pdf-container {
+  margin-top: 1.5rem;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.loading-message {
+  font-style: italic;
+  color: #6b7280;
+}

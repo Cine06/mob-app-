@@ -1,0 +1,271 @@
+.assessment-preview-main-content {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  color: #333;
+}
+
+/* Preview Title */
+.preview-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: #1a202c;
+  margin-bottom: 8px;
+  border-bottom: 2px solid #e2e8f0;
+  padding-bottom: 8px;
+}
+
+/* Preview Description */
+.preview-description {
+  font-size: 15px;
+  color: #4a5568;
+  margin-bottom: 24px;
+  line-height: 1.6;
+}
+
+/* Container for each question */
+.preview-question-container {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+}
+
+/* Question text (Q1, Q2, etc.) */
+.preview-question-text {
+  font-size: 16px;
+  font-weight: 500;
+  color: #2d3748;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.preview-question-text b {
+  color: #046a38; /* Main theme color */
+}
+
+/* --- Multiple Choice & True/False --- */
+.preview-choices-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.preview-choice-item {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background-color: #f7fafc;
+  transition: all 0.2s ease-in-out;
+}
+
+.preview-choice-indicator {
+  font-size: 18px;
+  margin-right: 12px;
+  color: #a0aec0;
+}
+
+.preview-choice-text {
+  font-size: 15px;
+  color: #4a5568;
+}
+
+/* Correct Answer Styling */
+.preview-choice-item.correct {
+  background-color: #f0fff4;
+  border-color: #9ae6b4;
+}
+
+.preview-choice-item.correct .preview-choice-indicator {
+  color: #38a169;
+  font-weight: bold;
+}
+
+.preview-choice-item.correct .preview-choice-text {
+  color: #2f855a;
+  font-weight: 500;
+}
+
+/* --- Matching Question --- */
+.preview-correct-pairs {
+  margin-bottom: 20px;
+}
+
+.preview-correct-pairs strong {
+  display: block;
+  margin-bottom: 10px;
+  color: #2d3748;
+}
+
+.matching-pairs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 10px;
+}
+
+.matching-pair-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #f7fafc;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  font-size: 14px;
+}
+
+.matching-pair-item .arrow {
+  color: #046a38;
+  font-weight: bold;
+  margin: 0 10px;
+}
+
+/* --- Short Answer / Fill in the Blanks --- */
+.preview-answer-display {
+  margin-top: 10px;
+  font-size: 15px;
+  color: #4a5568;
+}
+
+.correct-answer-badge {
+  display: inline-block;
+  background-color: #e6fffa;
+  color: #2c7a7b;
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-weight: 500;
+  border: 1px solid #b2f5ea;
+  margin-left: 8px;
+}
+
+/* --- Drag and Drop Preview Styles --- */
+.dnd-container {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.dnd-prompts, .dnd-choices-pool-container {
+  flex: 1;
+  min-width: 250px;
+}
+.dnd-prompts strong, .dnd-choices-pool-container strong {
+  display: block;
+  margin-bottom: 10px;
+  color: #2d3748;
+}
+.dnd-prompt-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  gap: 10px;
+}
+.dnd-prompt-text {
+  flex-basis: 50%;
+  font-size: 15px;
+}
+.dnd-slot {
+  flex-basis: 50%;
+  border: 2px dashed #cbd5e0;
+  border-radius: 6px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+}
+.dnd-slot.over { background-color: #ebf8ff; }
+.dnd-slot.filled { border-style: solid; padding: 2px; }
+.dnd-drop-placeholder { color: #a0aec0; font-size: 13px; }
+.dnd-choices-pool {
+  border: 2px dashed #cbd5e0;
+  border-radius: 6px;
+  padding: 10px;
+  min-height: 150px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dnd-choices-pool.over { background-color: #ebf8ff; }
+.dnd-choice-item {
+  background-color: white;
+  border: 1px solid #e2e8f0;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: grab;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  font-size: 14px;
+}
+.dnd-choice-item.dragging { box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
+
+.preview-wrapper {
+  margin-top: 20px;
+  padding: 10px;
+  border-top: 1px solid #ccc;
+}
+
+.preview-container {
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.preview-task-list {
+  flex: 1;
+  margin: 10px;
+  padding: 10px;
+  border: 1px solid #ddd;
+  max-height: 300px;
+  overflow-y: auto;
+  border-radius: 10px;
+  background-color: #fff;
+}
+
+.preview-task-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f9fafb;
+  padding: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.preview-task-item.selected {
+  background-color: #c7d2fe;
+}
+
+.preview-task-item:hover {
+  background-color: #e5e7eb;
+}
+
+.preview-delete-icon {
+  color: #ef4444;
+  cursor: pointer;
+}
+
+.assessment-preview-container {
+  border-top: 1px solid #ccc;
+  margin-top: 20px;
+  padding: 10px;
+  background: #fafafa;
+  min-height: 200px;
+}
+
+.preview-placeholder, .preview-empty {
+  color: #666;
+  font-style: italic;
+  padding: 40px 0;
+  text-align: center;
+}
+
+.task-list .task-item.selected {
+  background-color: #dbeafe;
+  border-left: 4px solid #3b82f6;
+  cursor: pointer;
+}

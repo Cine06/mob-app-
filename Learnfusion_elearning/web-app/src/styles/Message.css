@@ -1,0 +1,349 @@
+.message-container {
+  flex-direction: column;
+  margin-left: 250px;
+  padding: 2rem;
+  background-color: #f9f9f9;
+  min-height: 100vh;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  transition: all 0.3s ease;
+}
+
+.message-title {
+  text-align: center;
+  font-size: 2rem;
+  font-weight: bold;
+  margin-bottom: 2rem;
+  color: #05642d;
+  animation: slideIn 0.6s ease-out;
+}
+.message-item {
+  display: flex;
+  align-items: flex-start;
+  padding: 10px 0;
+  border-bottom: 1px solid #eee;
+}
+.message-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  margin-right: 10px;
+  object-fit: cover;
+}
+.message-details { flex: 1; }
+.message-content-snippet { color: #555; margin: 4px 0; }
+.message-timestamp { font-size: 0.8em; color: #999; }
+
+.message-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.message-tabs button {
+  padding: 0.6rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  background-color: #e6e6e6;
+  color: #333;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.3s ease;
+  position: relative;
+}
+
+.message-tabs button.active,
+.message-tabs button:hover {
+  background-color: #05642d;
+  color: white;
+}
+
+.message-tabs button::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 2px;
+  background-color: #ffa500;
+  bottom: 0;
+  left: 0;
+  transform: scaleX(0);
+  transform-origin: bottom right;
+  transition: transform 0.3s ease-in-out;
+}
+.recipient-search-container {
+  position: relative;
+}
+.clear-recipient-btn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #eee;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 2px 5px;
+  cursor: pointer;
+}
+.recipient-suggestions {
+  list-style: none;
+  padding: 0;
+  margin: 5px 0 0 0;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: white;
+  position: absolute;
+  width: 100%;
+  z-index: 100;
+  max-height: 150px;
+  overflow-y: auto;
+}
+.recipient-suggestions li {
+  padding: 8px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+.recipient-suggestions li:hover {
+  background-color: #f0f0f0;
+}
+.suggestion-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  margin-right: 8px;
+  object-fit: cover;
+}
+.search-error-message {
+  font-size: 0.9em;
+  color: #777;
+  margin-top: 4px;
+}
+.conversation-item {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  border-bottom: 1px solid #eee;
+  transition: background-color 0.2s ease-in-out;
+}
+.conversation-item:hover {
+  background-color: #f5f5f5;
+}
+ .conversation-item {
+   cursor: pointer;
+ }
+
+.conversation-item {
+  cursor: pointer;
+}
+.conversation-item:hover {
+  background-color: #f5f5f5;
+}
+.unread-badge {
+  background-color: #05642d; 
+  color: white;
+  border-radius: 10px;
+  padding: 2px 6px;
+  font-size: 0.75em;
+  margin-left: 8px;
+  font-weight: bold;
+}
+.unread-message { font-weight: bold; color: #333; }
+
+.message-tabs button.active::after {
+  transform: scaleX(1);
+  transform-origin: bottom left;
+}
+
+.message-card {
+  background-color: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  padding: 2rem;
+  max-width: 900px;
+  margin: 0 auto;
+  animation: fadeIn 0.6s ease-out;
+}
+
+.subheading {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #05642d;
+  margin-bottom: 1rem;
+}
+
+.placeholder {
+  color: #666;
+  font-style: italic;
+}
+
+.message-form label {
+  display: block;
+  margin-bottom: 1rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #333;
+}
+
+.message-form input,
+.message-form textarea {
+  width: 97%;
+  padding: 0.8rem;
+  margin-top: 0.3rem;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: border-color 0.3s ease;
+}
+
+.message-form input:focus,
+.message-form textarea:focus {
+  border-color: #05642d;
+  outline: none;
+}
+
+.message-controls {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.send-btn,
+.cancel-btn {
+  padding: 0.7rem 1.8rem;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  min-width: 140px;
+}
+
+.send-btn {
+  background-color: #05642d;
+  color: white;
+}
+
+.send-btn:hover {
+  background-color: #ffa500;
+}
+
+.cancel-btn {
+  background-color: #6c757d;
+  color: white;
+}
+
+.cancel-btn:hover {
+  background-color: #495057;
+}
+
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.tab-content {
+  opacity: 0;
+  animation: fadeIn 0.6s ease-out forwards;
+}
+
+@media (max-width: 768px) {
+  .message-container {
+    margin-left: 0;
+    padding: 1rem;
+  }
+
+  .message-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .send-btn,
+  .cancel-btn {
+    width: 100%;
+  }
+}
+
+.inbox-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.manage-btn,
+.cancel-selection-btn {
+  padding: 0.4rem 0.8rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.3s ease;
+}
+
+.manage-btn {
+  background-color: #f0f0f0;
+  border-color: #ddd;
+}
+
+.manage-btn:hover {
+  background-color: #e0e0e0;
+}
+
+.selection-controls {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.delete-selected-btn {
+  background: none;
+  border: none;
+  color: #dc3545; /* Red color */
+  cursor: pointer;
+  font-size: 1.2rem; /* Adjust icon size */
+  padding: 0.4rem;
+  border-radius: 6px;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.delete-selected-btn:hover {
+  background-color: #fbebeb; /* Light red on hover */
+}
+
+.cancel-selection-btn {
+  background-color: #6c757d;
+  color: white;
+}
+
+.cancel-selection-btn:hover {
+  background-color: #5a6268;
+}
+
+.conversation-checkbox {
+  margin-right: 15px;
+  cursor: pointer;
+  transform: scale(1.2);
+}
+
+.select-all-container {
+  padding: 10px;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#select-all {
+  transform: scale(1.2);
+}

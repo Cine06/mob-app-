@@ -1,0 +1,126 @@
+.report-dashboard-container {
+  display: flex;
+  height: 100vh;
+  background-color: #fff;
+  flex-direction: column;
+  margin-left: 250px;
+}
+
+.report-dashboard-content {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  background-color: #f9f9f9;
+  padding-bottom: 60px;
+}
+
+.report-dashboard-content h2 {
+  font-size: 26px;
+  font-weight: 700;
+  color: #05642d;
+  margin-bottom: 20px;
+}
+
+.report-back {
+  background-color: transparent;
+  border: none;
+  color: #05642d;
+  font-size: 16px;
+  cursor: pointer;
+  margin-bottom: 10px;
+  text-decoration: underline;
+}
+
+.report-table-container {
+  overflow-x: auto;
+  margin-top: 10px;
+}
+
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.report-table th,
+.report-table td {
+  padding: 15px;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+  vertical-align: top;
+}
+
+.report-table th {
+  background-color: #05642d;
+  color: #fff;
+  font-weight: 600;
+}
+
+.report-table tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+.report-table tr:hover {
+  background-color: #f1f1f1;
+}
+
+.report-table td div {
+  margin-bottom: 4px;
+}
+
+.report-table td:last-child {
+  font-weight: bold;
+}
+
+.report-table td:last-child::before {
+  content: "● ";
+  font-size: 14px;
+  vertical-align: middle;
+}
+
+.report-table td:has(.report-status-pass)::before {
+  color: #05642d;
+}
+
+.report-table td:has(.report-status-fail)::before {
+  color: #ff6347;
+}
+
+.report-status-pass {
+  color: #05642d;
+  font-weight: bold;
+  background-color: #e8f5e8;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid #05642d;
+}
+
+.report-status-fail {
+  color: #ff6347;
+  font-weight: bold;
+  background-color: #ffe8e8;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid #ff6347;
+}
+
+.score-display {
+  color: #05642d;
+  font-weight: bold;
+  background-color: #e8f5e8;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid #05642d;
+  font-size: 12px;
+  white-space: nowrap;
+  min-width: 200px;
+  display: inline-block;
+}
+
+.no-score {
+  color: #666;
+  font-style: italic;
+}
