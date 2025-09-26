@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../utils/supabaseClient";
-import Swal from "sweetalert2";
+import Swal from 'sweetalert2';
 import "sweetalert2/dist/sweetalert2.min.css";
 import "../styles/AddUser.css";
 import AdminSidebar from "./AdminSidebar";

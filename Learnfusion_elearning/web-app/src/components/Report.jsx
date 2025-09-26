@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable"; 
-import Swal from "sweetalert2";
+import Swal from 'sweetalert2';
 import Sidebar from "./Sidebar";
 import { supabase } from "../utils/supabaseClient"; 
 import { useAuth } from "../context/AuthContext";

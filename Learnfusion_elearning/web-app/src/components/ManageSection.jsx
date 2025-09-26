@@ -3,7 +3,7 @@ import { FaArchive, FaSearch, FaUserEdit, FaUserMinus } from "react-icons/fa";
 import { supabase } from "../utils/supabaseClient";
 import Sidebar from "./Sidebar";
 import { useParams, useNavigate } from "react-router-dom";
-import Swal from "sweetalert2";
+import Swal from 'sweetalert2';
 import "sweetalert2/dist/sweetalert2.min.css";
 import "../styles/sections.css";
 import "../styles/Handouts.css";

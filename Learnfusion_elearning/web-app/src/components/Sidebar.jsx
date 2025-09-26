@@ -1,21 +1,23 @@
 import React from "react";
 import "../styles/Sidebar.css";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 const Sidebar = () => {
   const { setUser } = useAuth();
+  const navigate = useNavigate();
+
   const handleLogout = () => {
     localStorage.clear();
-    setUser(null); 
-    window.location.href = "/";
+    setUser(null);
+    navigate("/");
   };
 
   return (
     <div className="sidebar-container">
       <div className="sidebar">
         <div className="sidebar-logo">
-          <img src="/logo.png" alt="LearnFusion Logo" />
+          <img src={`${import.meta.env.BASE_URL}logo.png`} alt="LearnFusion Logo" />
           <h2><span className="highlight">Learn</span>Fusion</h2>
         </div>
 

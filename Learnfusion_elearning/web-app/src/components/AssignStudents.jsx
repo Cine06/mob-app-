@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { supabase } from "../utils/supabaseClient";
 import { useNavigate, useParams } from "react-router-dom";
 import "../styles/assignStudents.css";
-import Swal from "sweetalert2";
+import Swal from 'sweetalert2';
 import "sweetalert2/dist/sweetalert2.min.css";
 import Sidebar from './Sidebar';
 

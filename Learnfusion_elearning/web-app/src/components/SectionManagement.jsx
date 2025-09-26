@@ -3,7 +3,7 @@ import Sidebar from "./Sidebar";
 import { supabase } from "../utils/supabaseClient";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import Swal from "sweetalert2";
+import Swal from 'sweetalert2';
 import { archiveRecord } from "../utils/archiveService";
 import "sweetalert2/dist/sweetalert2.min.css";
 import { FaArchive, FaUserEdit, FaSearch } from "react-icons/fa";

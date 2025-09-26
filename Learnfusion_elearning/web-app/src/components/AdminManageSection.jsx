@@ -5,7 +5,7 @@ import AdminSidebar from "./AdminSidebar";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { archiveRecord } from "../utils/archiveService";
-import Swal from "sweetalert2";
+import Swal from 'sweetalert2';
 import "sweetalert2/dist/sweetalert2.min.css";
 import "../styles/sections.css";
 

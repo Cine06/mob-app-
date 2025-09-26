@@ -4,7 +4,7 @@ import { FaArchive, FaUserEdit, FaSearch } from "react-icons/fa";
 import { supabase } from "../utils/supabaseClient";
 import { archiveRecord } from "../utils/archiveService";
 import { useAuth } from "../context/AuthContext";
-import Swal from "sweetalert2";
+import Swal from 'sweetalert2';
 import "sweetalert2/dist/sweetalert2.min.css";
 import "../styles/sections.css";
 import { useNavigate } from "react-router-dom";
