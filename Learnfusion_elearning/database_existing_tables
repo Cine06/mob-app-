@@ -1,4 +1,4 @@
-existing tables in the database modify if needed.
+existing tables
 
 create table public.users (
   id uuid not null default gen_random_uuid (),
