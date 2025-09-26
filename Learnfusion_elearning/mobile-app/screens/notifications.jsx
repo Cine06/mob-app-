@@ -29,7 +29,7 @@ export default function Notifications() {
 
       const { data: messages, error: messagesError } = await supabase
         .from('messages')
-        .select('id, created_at, sender:sender_id(id, first_name, last_name)')
+        .select('id, created_at, sender:sender_id(id, first_name, last_name, profile_picture)')
         .eq('receiver_id', user.id)
         .eq('read', false); 
 
@@ -44,7 +44,8 @@ export default function Notifications() {
             pathname: '/chat',
             params: {
               senderId: msg.sender.id,
-              senderName: `${msg.sender.first_name} ${msg.sender.last_name}`.trim() || 'User'
+              senderName: `${msg.sender.first_name} ${msg.sender.last_name}`.trim() || 'User',
+              senderAvatar: msg.sender.profile_picture
             }},
           icon: 'envelope'
         });
@@ -175,16 +176,28 @@ export default function Notifications() {
   );
 
   const handleNotificationPress = async (item) => {
-    setNotifications(currentNotifs =>
-      currentNotifs.map(n => (n.id === item.id ? { ...n, isRead: true } : n))
-    );
+  setNotifications(currentNotifs =>
+    currentNotifs.map(n => (n.id === item.id ? { ...n, isRead: true } : n))
+  );
 
-    const updatedReadIds = new Set(readNotifIds).add(item.id);
-    setReadNotifIds(updatedReadIds);
-    await AsyncStorage.setItem('readNotificationIds', JSON.stringify(Array.from(updatedReadIds)));
+  const updatedReadIds = new Set(readNotifIds).add(item.id);
+  setReadNotifIds(updatedReadIds);
+  await AsyncStorage.setItem('readNotificationIds', JSON.stringify(Array.from(updatedReadIds)));
 
+  if (item.id.startsWith('msg-')) {
+    router.push({
+      pathname: '/messagedetails',
+      params: {
+        name: item.route.params.senderName,
+        avatar: item.route.params.senderAvatar,
+        receiverId: item.route.params.senderId,
+      },
+    });
+  } else {
     router.push(item.route);
-  };
+  }
+};
+
 
   const toggleSelection = (notificationId) => {
     setSelectedNotifications(prev => {
@@ -247,29 +260,44 @@ export default function Notifications() {
   }, [selectedNotifications, notifications]);
 
   const renderItem = ({ item }) => {
-    const isSelected = selectedNotifications.has(item.id);
-    return (
-      <TouchableOpacity
-        style={[styles.notificationItem, !item.isRead && styles.unreadItem, isSelected && styles.selectedItem]}
-        onPress={() => selectionMode ? toggleSelection(item.id) : handleNotificationPress(item)}
-        onLongPress={() => {
-          if (!selectionMode) {
-            setSelectionMode(true);
-            toggleSelection(item.id);
-          }
-        }}
-      >
-        {selectionMode && (
-          <MaterialIcons name={isSelected ? "check-box" : "check-box-outline-blank"} size={24} color="#046a38" style={{ marginRight: 15 }} />
-        )}
-        <FontAwesome5 name={item.icon || 'bell'} size={20} color="#046a38" style={styles.icon} />
-        <View style={{ flex: 1 }}>
-          <Text style={styles.message}>{item.message}</Text>
-          <Text style={styles.time}>{item.time}</Text>
-        </View>
-      </TouchableOpacity>
-    );
-  };
+  const isSelected = selectedNotifications.has(item.id);
+  return (
+    <TouchableOpacity
+      style={[
+        styles.notificationItem,
+        !item.isRead && styles.unreadItem,
+        isSelected && styles.selectedItem
+      ]}
+      onPress={() => selectionMode ? toggleSelection(item.id) : handleNotificationPress(item)}
+      onLongPress={() => {
+        if (!selectionMode) {
+          setSelectionMode(true);
+          toggleSelection(item.id);
+        }
+      }}
+    >
+      {selectionMode && (
+        <MaterialIcons
+          name={isSelected ? "check-box" : "check-box-outline-blank"}
+          size={24}
+          color="#046a38"
+          style={{ marginRight: 15 }}
+        />
+      )}
+      <FontAwesome5
+        name={item.icon || 'bell'}
+        size={20}
+        color="#046a38"
+        style={styles.icon}
+      />
+      <View style={{ flex: 1 }}>
+        <Text style={styles.message}>{item.message}</Text>
+        <Text style={styles.time}>{item.time}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+};
+
 
   return (
     <>

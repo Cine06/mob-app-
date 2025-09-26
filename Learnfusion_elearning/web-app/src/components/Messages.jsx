@@ -371,52 +371,113 @@ const Message = () => {
                   {conv.unreadCount > 0 && <span className="unread-badge">{conv.unreadCount}</span>}
                   </p>
                   {conv.latestMessage && conv.latestMessage.id ? (
-                    <>
-                      <p className={`message-content-snippet ${conv.latestMessage.sender_id !== user.id && !conv.latestMessage.read ? 'unread-message' : ''}`}>
-                        {conv.latestMessage.sender_id === user.id && "You: "}
-                        {conv.latestMessage.file_url
-                          ? `📄 ${conv.latestMessage.file_name || 'Attachment'}`
-                          : `${conv.latestMessage.content.substring(0, 70)}${conv.latestMessage.content.length > 70 ? '...' : ''}`
-                        }
+                    <div className="message-summary">
+                      <p className={`message-content-snippet ${conv.unreadCount > 0 ? 'unread' : ''}`}>
+                        {(() => {
+                          const isSender = conv.latestMessage.sender_id === user.id;
+                          const prefix = isSender ? "You: " : "";
+                          const content = conv.latestMessage.file_url
+                            ? `📄 ${conv.latestMessage.file_name || 'File'}`
+                            : conv.latestMessage.content;
+                          return `${prefix}${content}`;
+                        })()}
                       </p>
                       <p className="message-timestamp">{
                         (() => {
                           const timestamp = conv.latestMessage.created_at;
                           if (!timestamp) return "";
-
-                          const timeZone = 'Asia/Manila';
-                          const messageDate = new Date(timestamp);
-
-                          const datePartFormatter = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' });
-                          
-                          const nowInPH = new Date(new Date().toLocaleString('en-US', { timeZone }));
+                      
+                          const utcDate = new Date(timestamp);
+                          if (isNaN(utcDate.getTime())) return "";
+                      
+                          const timeZone = "Asia/Manila";
+                          const nowInPH = new Date(new Date().toLocaleString("en-US", { timeZone }));
                           const yesterdayInPH = new Date(nowInPH);
                           yesterdayInPH.setDate(yesterdayInPH.getDate() - 1);
-                          
-                          const messageDateString = datePartFormatter.format(messageDate);
+                      
+                          const datePartFormatter = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" });
+                          const messageDateString = datePartFormatter.format(utcDate);
                           const todayDateString = datePartFormatter.format(nowInPH);
                           const yesterdayDateString = datePartFormatter.format(yesterdayInPH);
-
+                      
                           if (messageDateString === todayDateString) {
-                            return messageDate.toLocaleTimeString('en-US', {
-                              hour: 'numeric', minute: '2-digit', hour12: true, timeZone,
-                            });
+                            return new Intl.DateTimeFormat("en-US", { timeZone, hour: "numeric", minute: "2-digit", hour12: true }).format(utcDate);
                           } else if (messageDateString === yesterdayDateString) {
-                            return 'Yesterday';
-                          } else if (messageDate.getFullYear() === nowInPH.getFullYear()) {
-                            return messageDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone });
+                            return "Yesterday";
+                          } else if (utcDate.getFullYear() === nowInPH.getFullYear()) {
+                            return new Intl.DateTimeFormat("en-US", { timeZone, month: "short", day: "numeric" }).format(utcDate);
                           } else {
-                            return messageDate.toLocaleDateString('en-US', { year: '2-digit', month: 'numeric', day: 'numeric', timeZone });
+                            return new Intl.DateTimeFormat("en-US", { timeZone, year: "2-digit", month: "numeric", day: "numeric" }).format(utcDate);
                           }
                         })()
                       }</p>
-                    </>
+                    </div>
                   ) : (
                     <p className="message-content-snippet">No messages yet</p>
                   )}
                 </div>
               </div>
             ))}
+             {/* <p className="message-timestamp">{
+  (() => {
+    const timestamp = conv.latestMessage.created_at;
+    if (!timestamp) return "";
+
+    // Normalize Supabase timestamp → strip microseconds to 3 digits
+    const safeTimestamp = timestamp.replace(
+      /\.(\d{3})\d*([+-]\d{2}:\d{2})$/,
+      ".$1$2"
+    );
+
+    const utcDate = new Date(conv.latestMessage.created_at);
+
+    if (isNaN(utcDate.getTime())) {
+      console.warn("Invalid date after normalization:", safeTimestamp);
+      return "";
+    }
+
+    const timeZone = "Asia/Manila";
+
+    const datePartFormatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+
+    const nowInPH = new Date(new Date().toLocaleString("en-US", { timeZone }));
+    const yesterdayInPH = new Date(nowInPH);
+    yesterdayInPH.setDate(yesterdayInPH.getDate() - 1);
+
+    const messageDateString = datePartFormatter.format(utcDate);
+    const todayDateString = datePartFormatter.format(nowInPH);
+    const yesterdayDateString = datePartFormatter.format(yesterdayInPH);
+
+    if (messageDateString === todayDateString) {
+      return new Intl.DateTimeFormat("en-US", {
+        timeZone,
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      }).format(utcDate);
+    } else if (messageDateString === yesterdayDateString) {
+      return "Yesterday";
+    } else if (utcDate.getFullYear() === nowInPH.getFullYear()) {
+      return new Intl.DateTimeFormat("en-US", {
+        timeZone,
+        month: "short",
+        day: "numeric",
+      }).format(utcDate);
+    } else {
+      return new Intl.DateTimeFormat("en-US", {
+        timeZone,
+        year: "2-digit",
+        month: "numeric",
+        day: "numeric",
+      }).format(utcDate);
+    }
+  })()
+}</p> */}
           </div>
         )}
 

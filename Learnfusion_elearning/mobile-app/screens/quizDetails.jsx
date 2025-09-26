@@ -419,6 +419,7 @@ const QuizDetails = () => {
             title: 'Error',
             headerStyle: { backgroundColor: '#046a38' },
             headerTintColor: '#fff',
+            headerTitleAlign: 'center',
           }} 
         />
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f5f5f5', padding: 20 }}>
@@ -431,6 +432,7 @@ const QuizDetails = () => {
               borderRadius: 8,
               alignItems: 'center',
               minWidth: 200,
+              paddingTop:100,
             }}
             onPress={() => router.push('/lessons')}
           >
@@ -450,6 +452,7 @@ const QuizDetails = () => {
             title: 'Quiz Not Found',
             headerStyle: { backgroundColor: '#046a38' },
             headerTintColor: '#fff',
+            headerTitleAlign: 'center',
           }} 
         />
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f5f5f5', padding: 20 }}>
@@ -480,6 +483,7 @@ const QuizDetails = () => {
             title: quizData.title || 'Quiz',
             headerStyle: { backgroundColor: '#046a38' },
             headerTintColor: '#fff',
+            headerTitleAlign: 'center',
           }} 
         />
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f5f5f5', padding: 20 }}>
@@ -492,10 +496,10 @@ const QuizDetails = () => {
               borderRadius: 8,
               alignItems: 'center',
               minWidth: 200,
+              marginTop:100,
             }}
             onPress={() => router.push('/lessons')}
           >
-            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Back to Lessons</Text>
           </TouchableOpacity>
         </View>
       </>
@@ -505,11 +509,13 @@ const QuizDetails = () => {
   return (
     <>
       <Stack.Screen 
+      style={{ marginTop: 100 }}
         options={{ 
           headerShown: true, 
           title: quizData.title || 'Assessment',
           headerStyle: { backgroundColor: '#046a38' },
           headerTintColor: '#fff',
+          headerTitleAlign: 'center',
         }} 
       />
       
@@ -619,7 +625,6 @@ const QuizDetails = () => {
               {currentQuestion.question}
             </Text>
 
-
             {/* Multiple Choice */}
             {currentQuestion.activityType === 'Multiple Choice' && currentQuestion.choices && (
               <View style={{ marginBottom: 20 }}>
@@ -659,6 +664,7 @@ const QuizDetails = () => {
                         borderRadius: 8,
                         marginBottom: 10,
                         backgroundColor: backgroundColor,
+                        opacity: isCompleted ?
                         opacity: isCompleted ? 0.7 : 1,
                       }}
                       onPress={() => handleAnswer(choice)}
@@ -1057,6 +1063,7 @@ const QuizDetails = () => {
             })()}
           </View>
         )}
+        
       </ScrollView>
     </>
   );

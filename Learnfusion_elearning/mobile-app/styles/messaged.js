@@ -112,10 +112,9 @@ export default StyleSheet.create({
     marginLeft: 10,
     color: "#046a38",
   },
-  // In your styles/messaged.js file
 readReceipt: {
   fontSize: 10,
-  color: '#a0a0a0', // A subtle color for the read receipt
+  color: '#a0a0a0',
   alignSelf: 'flex-end',
   marginTop: 2,
   marginRight: 5,

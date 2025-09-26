@@ -102,7 +102,6 @@ public class HelloName {
             System.out.println("Index " + i + ": " + numbers[i]);
         }
         
-        // Enhanced for loop
         System.out.println("\\nUsing enhanced for loop:");
         for (int num : numbers) {
             System.out.println(num);

@@ -781,7 +781,6 @@ export default StyleSheet.create({
         fontSize: 16,
         fontWeight: "bold",
     },
-    // Enhanced Viewer Card Styles
     viewerCard: {
         backgroundColor: "#fff",
         borderRadius: 12,
@@ -826,7 +825,6 @@ export default StyleSheet.create({
         alignItems: "center",
         justifyContent: "center",
     },
-    // New interactive lesson styles
     completedStep: {
         backgroundColor: "#e8f5e8",
         borderColor: "#4CAF50",
@@ -873,7 +871,6 @@ export default StyleSheet.create({
     completedPageText: {
         color: "#4CAF50",
     },
-    // Enhanced lesson header styles
     progressPercentage: {
         fontSize: 12,
         color: "#046a38",
@@ -892,7 +889,6 @@ export default StyleSheet.create({
         borderWidth: 1,
         borderColor: "#e9ecef",
     },
-    // Modal styles
     modalOverlay: {
         flex: 1,
         backgroundColor: "rgba(0, 0, 0, 0.5)",
@@ -925,6 +921,10 @@ export default StyleSheet.create({
     },
     closeModalButton: {
         padding: 5,
+    },
+    modalHeaderButton: {
+        padding: 5,
+        marginLeft: 15,
     },
     modalContent: {
         padding: 20,
@@ -1037,7 +1037,6 @@ export default StyleSheet.create({
     primaryButtonText: {
         color: "#fff",
     },
-    // Video section styles
     videoSection: {
         backgroundColor: "#fff",
         padding: 15,
@@ -1079,7 +1078,6 @@ export default StyleSheet.create({
         fontSize: 16,
         fontWeight: "bold",
     },
-    // Code example styles
     codeSection: {
         backgroundColor: "#fff",
         borderRadius: 8,
@@ -1138,7 +1136,6 @@ export default StyleSheet.create({
         fontSize: 14,
         fontWeight: "bold",
     },
-    // Language comparison styles
     comparisonContainer: {
         gap: 15,
     },
@@ -1203,7 +1200,6 @@ export default StyleSheet.create({
         borderWidth: 1,
         borderColor: "#dee2e6",
     },
-    // File section styles
     fileSection: {
         backgroundColor: "#fff",
         padding: 15,
@@ -1230,7 +1226,6 @@ export default StyleSheet.create({
         marginBottom: 15,
         lineHeight: 18,
     },
-    // PDF Viewer styles
     pdfViewerContainer: {
         height: 400,
         backgroundColor: "#f8f9fa",
@@ -1295,7 +1290,6 @@ export default StyleSheet.create({
         fontSize: 12,
         fontWeight: "500",
     },
-    // Inline PDF viewer styles for handout viewer
     inlinePdfContainer: {
         height: 300,
         backgroundColor: "#f8f9fa",
@@ -1338,7 +1332,6 @@ export default StyleSheet.create({
         fontSize: 12,
         fontWeight: "bold",
     },
-    // Inline video player styles
     inlineVideoContainer: {
         height: 250,
         backgroundColor: "#000",
@@ -1369,7 +1362,6 @@ export default StyleSheet.create({
         fontSize: 12,
         fontWeight: "500",
     },
-    // Video error handling styles
     videoErrorContainer: {
         flex: 1,
         justifyContent: "center",
@@ -1405,7 +1397,6 @@ export default StyleSheet.create({
         fontSize: 14,
         fontWeight: "bold",
     },
-    // Debug info styles
     debugInfo: {
         backgroundColor: "#f0f0f0",
         padding: 10,
@@ -1419,10 +1410,6 @@ export default StyleSheet.create({
         color: "#666",
         fontFamily: "monospace",
     },
-    // No handouts message styles
-    // Add these new styles to your styles/modules.js file
-
-// For the lesson content cards
 contentCard: {
   backgroundColor: '#fff',
   borderRadius: 12,
@@ -1514,5 +1501,35 @@ mediaErrorButtonText: {
         textAlign: "center",
         lineHeight: 20,
     },
+
+
+documentViewerModal: {
+  height: '85%',
+  width: '95%',
+  backgroundColor: 'white',
+  borderRadius: 10,
+  padding: 0,
+  overflow: 'hidden',
+  elevation: 10,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.25,
+  shadowRadius: 4,
+},
+documentViewerContent: {
+  flex: 1,
+  borderBottomLeftRadius: 10,
+  borderBottomRightRadius: 10,
+  overflow: 'hidden',
+},
+viewFileText: {
+  marginTop: 8,
+  fontSize: 14,
+  color: '#046a38',
+  fontWeight: 'bold',
+},
+
+
   });
+  
   

@@ -3,9 +3,12 @@ import { View, Text, TextInput, TouchableOpacity, Image, Alert } from "react-nat
 import { useRouter } from "expo-router";
 import { supabase } from "../utils/supabaseClient"; 
 import Icon from "react-native-vector-icons/Feather";
-import bcrypt from "react-native-bcrypt"; 
+import bcrypt from "react-native-bcrypt";
+import { getRandomValues } from "react-native-get-random-values";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import styles from "../styles/login";
+
+bcrypt.setRandomFallback(getRandomValues);
 
 export default function LoginScreen() {
   const router = useRouter();

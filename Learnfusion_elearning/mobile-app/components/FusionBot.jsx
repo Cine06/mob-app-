@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import {  View,  Text,  TextInput,  TouchableOpacity,  ScrollView,  StyleSheet,  Image,  KeyboardAvoidingView,  Platform,  ActivityIndicator,  Keyboard} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import Markdown from "react-native-markdown-display";
 import { COHERE_API_KEY } from "@env";
 import styles from "../styles/fusionbot";
 import { supabase } from "../utils/supabaseClient";
@@ -17,27 +17,84 @@ The allowed topics are:
 6. Object-Oriented Programming (OOP): classes, objects, constructors, encapsulation (getters/setters), inheritance (extends), polymorphism, abstraction (abstract classes, interfaces), and exception handling (try-catch).
 If a user asks a question outside this scope, you must politely state that you can only answer questions about these specific Java topics. Do not answer the off-topic question.`;
 
+const javaKeywords = [
+  "java", "jvm", "jdk", "jre", "compile", "run", "program", "code", "syntax", "debugging", "hi", "hello",
+  "helloworld", "main", "system.out.println", "input", "output", "scanner", "date",
+  "variable", "data type", "primitive", "int", "double", "boolean", "char", "byte", "short", "long", "float",
+  "object", "reference", "string", "stringbuilder", "field", "lifecycle", "garbage collection", "system.gc",
+  "operator", "arithmetic", "relational", "logical", "precedence", "parentheses", "equality", "==", ".equals",
+  "if", "else", "switch", "case",
+  "array", "1d", "2d", "multidimensional", "collection", "arraylist", "add", "remove", "get", "size",
+  "loop", "while", "for", "do-while", "enhanced-for", "break", "continue",
+  "oop", "object-oriented", "class", "object", "field", "constructor", "method", "encapsulation", "private",
+  "public", "protected", "getter", "setter", "inheritance", "superclass", "subclass", "extends", "override",
+  "tostring", "equals", "polymorphism", "upcasting", "dispatch", "abstraction", "abstract", "interface",
+  "implements", "exception", "handling", "try", "catch", "finally", "throw", "throws", "custom exception", "uml"
+];
+const restrictedWords = ["javarice", "java rice", "rice"];
+
+const initialChatHistory = [
+  { role: "SYSTEM", message: systemPrompt },
+  { role: "CHATBOT", message: "Hi, I’m FusionBot! You can ask me questions related to Java programming." }
+];
+
 const FusionBot = ({ currentUser }) => {
-  const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState("");
   const [loading, setLoading] = useState(false);
-  const [chatHistory, setChatHistory] = useState([
-    {
-      role: "SYSTEM",
-      message: systemPrompt,
-    },
-  ]);
+  const [chatHistory, setChatHistory] = useState(initialChatHistory);
   const scrollRef = useRef();
 
-  const scrollToBottom = () => {
+  const scrollToBottom = React.useCallback(() => {
     setTimeout(() => scrollRef?.current?.scrollToEnd({ animated: true }), 100);
+  }, []);
+
+  const isMessageOnTopic = (message) => {
+    const lowerCaseMessage = message.toLowerCase();
+    const isRelated = javaKeywords.some(keyword => lowerCaseMessage.includes(keyword));
+    const isRestrictedTopic = restrictedWords.some(word => lowerCaseMessage.includes(word));
+    return isRelated && !isRestrictedTopic;
+  };
+
+  const saveMessagesToDb = async (messagesToSave) => {
+    if (!currentUser) return;
+    const records = messagesToSave.map(msg => ({
+      user_id: currentUser.id,
+      sender: msg.role === 'USER' ? 'user' : 'bot',
+      text: msg.message,
+    }));
+    const { error } = await supabase.from('chatbot_history').insert(records);
+    if (error) {
+      console.error("Error saving chat history:", error.message);
+    }
+  };
+
+  const getBotResponse = async (currentChatHistory, userMessage) => {
+    try {
+      const response = await axios.post(
+        "https://api.cohere.ai/v1/chat",
+        {
+          model: "command-a-03-2025",
+          chat_history: currentChatHistory.filter(m => m.role !== 'SYSTEM'),
+          message: userMessage,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${COHERE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      return response.data?.text?.trim() || "Sorry, I couldn’t find an answer for that.";
+    } catch (err) {
+      console.error("API Error in handleSend:", err.response?.data || err.message);
+      return "Oops! Something went wrong. Please check your connection or try again later.";
+    }
   };
 
   useEffect(() => {
     if (!currentUser) {
-      setMessages([
-        { sender: "bot", text: "Please log in to use the chatbot." },
-      ]);
+      setChatHistory([{ role: "CHATBOT", message: "Please log in to use the chatbot." }]);
       return;
     }
 
@@ -51,16 +108,15 @@ const FusionBot = ({ currentUser }) => {
 
       if (error) {
         console.error("Error loading messages:", error);
-        setMessages([{ sender: "bot", text: "Could not load previous conversation." }]);
-      } else if (data.length > 0) {
-        setMessages(data);
+        setChatHistory([{ role: "CHATBOT", message: "Could not load previous conversation." }]);
+      } else if (data && data.length > 0) {
         const history = data.map(msg => ({
           role: msg.sender === 'user' ? 'USER' : 'CHATBOT',
           message: msg.text
         }));
-        setChatHistory(prev => [prev[0], ...history]);
+        setChatHistory([initialChatHistory[0], ...history]); 
       } else {
-        setMessages([{ sender: "bot", text: "Hi, I’m FusionBot! You can ask me questions related to Java programming." }]);
+        setChatHistory(initialChatHistory);
       }
       setLoading(false);
     };
@@ -70,128 +126,35 @@ const FusionBot = ({ currentUser }) => {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, loading]);
+  }, [chatHistory, loading, scrollToBottom]);
 
-  const handleSend = async () => {
+  const handleSend = React.useCallback(async () => {
     if (!inputText.trim() || !currentUser) return;
-    const userMessage = inputText.trim();
 
-    const javaKeywords = [ // Expanded keywords for better client-side filtering
-      // General
-      "java", "jvm", "jdk", "jre", "compile", "run", "program", "code", "syntax", "debugging", "hi", "hello",
-      // Basics
-      "helloworld", "main", "system.out.println", "input", "output", "scanner", "date",
-      // Variables & Data Types
-      "variable", "data type", "primitive", "int", "double", "boolean", "char", "byte", "short", "long", "float",
-      "object", "reference", "string", "stringbuilder", "field", "lifecycle", "garbage collection", "system.gc",
-      // Operators & Decision Constructs
-      "operator", "arithmetic", "relational", "logical", "precedence", "parentheses", "equality", "==", ".equals",
-      "if", "else", "switch", "case",
-      // Arrays & Collections
-      "array", "1d", "2d", "multidimensional", "collection", "arraylist", "add", "remove", "get", "size",
-      // Looping Constructs
-      "loop", "while", "for", "do-while", "enhanced-for", "break", "continue",
-      // OOP
-      "oop", "object-oriented", "class", "object", "field", "constructor", "method", "encapsulation", "private",
-      "public", "protected", "getter", "setter", "inheritance", "superclass", "subclass", "extends", "override",
-      "tostring", "equals", "polymorphism", "upcasting", "dispatch", "abstraction", "abstract", "interface",
-      "implements", "exception", "handling", "try", "catch", "finally", "throw", "throws", "custom exception", "uml"
-    ];
-    const restrictedWords = ["javarice", "java rice", "rice"];
-
-    const isJavaRelated = javaKeywords.some(keyword =>
-      userMessage.toLowerCase().includes(keyword)
-    );
-    const isRestricted = restrictedWords.some(restricted =>
-      userMessage.toLowerCase().includes(restricted)
-    );
-
-    const userMessageObject = { sender: "user", text: userMessage };
-    setMessages((prevMessages) => [...prevMessages, userMessageObject]);
+    const userMessageText = inputText.trim();
+    const userMessage = { role: "USER", message: userMessageText };
+    
     setInputText("");
+    setChatHistory(prev => [...prev, userMessage]);
     setLoading(true);
 
-    if (!isJavaRelated || isRestricted) {
-      const botMessage = {
-        sender: "bot",
-        text: "Sorry, I can only answer questions related to Java programming.",
-      };
-      setMessages((prevMessages) => [...prevMessages, botMessage]);
-      
-      const { error: saveError } = await supabase
-      .from('chatbot_history')
-      .insert([
-         { user_id: currentUser.id, sender: 'user', text: userMessage },
-          { user_id: currentUser.id, sender: 'bot', text: botMessage.text }
-        ]);
-
-      if (saveError) {
-          console.error("Error saving off-topic message:", saveError.message);
-      }
-
-
-      setChatHistory(prev => [...prev, { role: "USER", message: userMessage }, { role: "CHATBOT", message: botMessage.text }]);
-
-      setLoading(false);
-      return;
-    }
-
-    const apiChatHistory = chatHistory
-      .filter((msg) => msg.role !== "SYSTEM")
-      .map(({ role, message }) => ({ role, message }));
-
     try {
-      const response = await axios.post(
-        "https://api.cohere.ai/v1/chat",
-        {
-          model: "command-a-03-2025",
-          chat_history: apiChatHistory,
-          message: userMessage,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${COHERE_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      const botReplyText = response.data?.text?.trim() || "Sorry, I couldn’t find an answer for that.";
-      const botMessageObject = {
-        sender: "bot",
-        text: botReplyText,
-      };
-
-      setMessages((prevMessages) => [...prevMessages, botMessageObject]);
-      setChatHistory((prevHistory) => [
-        ...prevHistory,
-        { role: "USER", message: userMessage },
-        { role: "CHATBOT", message: botReplyText },
-      ]);
-
-      const { error: insertError } = await supabase.from('chatbot_history').insert([
-        { user_id: currentUser.id, sender: 'user', text: userMessage },
-        { user_id: currentUser.id, sender: 'bot', text: botReplyText }
-      ]);
-
-      if (insertError) {
-        console.error("Error saving chat history:", insertError.message);
+      let botMessageText;
+      if (isMessageOnTopic(userMessageText)) {
+        botMessageText = await getBotResponse([...chatHistory, userMessage], userMessageText);
+      } else {
+        botMessageText = "Sorry, I can only answer questions related to Java programming.";
       }
-    } catch (err) {
-      console.error("API Error in handleSend:", err.response?.data || err.message);
-      setMessages((prevMessages) => [
-        ...prevMessages,
-        {
-          sender: "bot",
-          text: "Oops! Something went wrong. Please check your connection or try again later.",
-        },
-      ]);
+
+      const botMessage = { role: "CHATBOT", message: botMessageText };
+      setChatHistory(prev => [...prev, botMessage]);
+      saveMessagesToDb([userMessage, botMessage]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [inputText, currentUser, chatHistory]);
 
-  const handleRefresh = async () => {
+  const handleRefresh = React.useCallback(async () => {
     if (!currentUser) return;
 
     const { error } = await supabase
@@ -203,16 +166,12 @@ const FusionBot = ({ currentUser }) => {
       console.error("Error clearing conversation:", error);
       alert("Could not clear conversation. Please try again.");
     } else {
-      setMessages([
-        {
-          sender: "bot",
-          text: "Hi, I’m FusionBot! You can ask me questions related to Java programming.",
-        },
-      ]);
       setInputText("");
-      setChatHistory([{ role: "SYSTEM", message: systemPrompt }]);
+      setChatHistory(initialChatHistory);
     }
-  };
+  }, [currentUser]);
+
+  const renderableChat = chatHistory.filter(m => m.role !== 'SYSTEM');
 
   return (
     <KeyboardAvoidingView
@@ -229,15 +188,15 @@ const FusionBot = ({ currentUser }) => {
           showsVerticalScrollIndicator={true}
           onScrollBeginDrag={Keyboard.dismiss}
         >
-          {messages.map((msg, index) => (
+          {renderableChat.map((msg, index) => (
             <View
               key={index}
               style={[
                 styles.messageContainer,
-                msg.sender === "bot" ? styles.botContainer : styles.userContainer,
+                msg.role === "CHATBOT" ? styles.botContainer : styles.userContainer,
               ]}
             >
-              {msg.sender === "bot" && (
+              {msg.role === "CHATBOT" && (
                 <Image
                   source={require("../assets/chatbot-icon.png")}
                   style={styles.botIcon}
@@ -246,12 +205,16 @@ const FusionBot = ({ currentUser }) => {
               <View
                 style={[
                   styles.message,
-                  msg.sender === "bot" ? styles.botMsg : styles.userMsg,
+                  msg.role === "CHATBOT" ? styles.botMsg : styles.userMsg,
                 ]}
               >
-                <Text style={msg.sender === "bot" ? styles.botText : styles.userText}>
-                  {msg.text}
-                </Text>
+                {msg.role === "CHATBOT" ? (
+                  <Markdown style={{ body: styles.botText }}>{msg.message}</Markdown>
+                ) : (
+                  <Text style={styles.userText}>
+                    {msg.message}
+                  </Text>
+                )}
               </View>
             </View>
           ))}

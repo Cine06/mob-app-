@@ -49,8 +49,8 @@
       }
       setFilteredUsers(filtered);
       setCurrentPage(1);
-      setIsSelectionMode(false); // Reset selection mode on filter change
-      setSelectedUsers([]); // Reset selection when filters change
+      setIsSelectionMode(false); 
+      setSelectedUsers([]); 
     }, [searchTerm, selectedRole, users]);
 
     const fetchUsers = async () => {
@@ -126,7 +126,7 @@
 
     const toggleSelectionMode = () => {
       setIsSelectionMode(prevMode => {
-        if (prevMode) { // If turning selection mode OFF
+        if (prevMode) { 
           setSelectedUsers([]);
         }
         return !prevMode;
@@ -208,8 +208,8 @@
         pageNumber <= Math.ceil(filteredUsers.length / usersPerPage)
       ) {
         setCurrentPage(pageNumber);
-        setIsSelectionMode(false); // Reset selection mode on page change
-        setSelectedUsers([]); // Reset selection on page change
+        setIsSelectionMode(false); 
+        setSelectedUsers([]); 
       }
     };
 

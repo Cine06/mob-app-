@@ -3,7 +3,7 @@ import {StyleSheet} from "react-native";
 export default StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#fff" // Use a clean white background for the main screen
+        backgroundColor: "#fff" 
     },
     header: {
         flexDirection: "row",
@@ -11,9 +11,8 @@ export default StyleSheet.create({
         justifyContent: "space-between",
         paddingHorizontal: 15,
         paddingVertical: 15,
-        paddingTop: 45, // Adjust for status bar height
+        paddingTop: 45, 
         backgroundColor: '#046a38',
-        // Add a subtle shadow for depth
         shadowColor: "#000",
         shadowOffset: {
             width: 0,
@@ -25,7 +24,7 @@ export default StyleSheet.create({
     },
     headerText: {
         color: "white",
-        fontSize: 20, // Slightly larger for better presence
+        fontSize: 20, 
         fontWeight: "bold"
     },
     manageButton: {
@@ -35,7 +34,7 @@ export default StyleSheet.create({
     },
     messageList: {
         flex: 1,
-        backgroundColor: '#fff', // Ensure list background is white
+        backgroundColor: '#fff', 
     },
     messageItem: {
         flexDirection: "row",
@@ -43,18 +42,18 @@ export default StyleSheet.create({
         paddingHorizontal: 15,
         paddingVertical: 12,
         borderBottomWidth: 1,
-        borderBottomColor: '#f0f0f0', // A very light separator for a clean look
-        backgroundColor: 'transparent', // No background color needed if list is white
+        borderBottomColor: '#f0f0f0', 
+        backgroundColor: 'transparent', 
     },
     unreadMessageItem: {
-        backgroundColor: '#F0FDF4', // A very subtle, elegant green tint for unread items
+        backgroundColor: '#F0FDF4', 
     },
     unreadTextContent: {
         fontWeight: 'bold',
-        color: '#111', // Make unread text darker for emphasis
+        color: '#111', 
     },
     avatar: {
-        width: 50, // Slightly larger avatars
+        width: 50, 
         height: 50,
         borderRadius: 25,
         marginRight: 15
@@ -65,26 +64,25 @@ export default StyleSheet.create({
     },
     messageName: {
         fontSize: 16,
-        fontWeight: "600", // Use semi-bold for a modern feel
+        fontWeight: "600", 
         color: '#333',
     },
     messageText: {
         fontSize: 14,
-        color: "#666", // A softer gray for the message preview
+        color: "#666", 
         marginTop: 2,
     },
     messageTime: {
         fontSize: 12,
-        color: "#999", // Lighter gray for the timestamp
+        color: "#999", 
         marginLeft: 10,
     },
     noMessages: {
         textAlign: "center",
         marginTop: 50,
         fontSize: 16,
-        color: "#888" // A soft gray for the empty state message
+        color: "#888" 
     },
-    // --- The styles below are for the "New Message" screen and are not modified ---
         newContactContainer: { 
             flexDirection: "row", 
             padding: 10, 

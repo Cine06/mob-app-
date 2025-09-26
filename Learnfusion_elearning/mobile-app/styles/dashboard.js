@@ -79,7 +79,7 @@ export default StyleSheet.create({
         borderColor: "black",
         borderWidth: 2,
       },
-      reminders: {
+      notifications: {
         flexDirection: "row",
         alignItems: "center",
         backgroundColor: "#FFF",

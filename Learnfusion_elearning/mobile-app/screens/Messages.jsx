@@ -52,6 +52,8 @@ export default function Messages() {
         }
       };
       fetchUserAndConversations();
+
+      return () => {};
     }, [fetchConversations])
   );
 

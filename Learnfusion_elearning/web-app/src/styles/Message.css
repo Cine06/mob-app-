@@ -107,6 +107,7 @@
 .recipient-suggestions li:hover {
   background-color: #f0f0f0;
 }
+
 .suggestion-avatar {
   width: 24px;
   height: 24px;
@@ -292,7 +293,7 @@
 }
 
 .manage-btn {
-  background-color: #f0f0f0;
+  background-color: #05642d;
   border-color: #ddd;
 }
 

@@ -218,7 +218,6 @@ export default function AssignmentDetails() {
         return question.correctAnswer || question.answer;
       case 'Matching':
         if (question.matchingPairs) {
-          // The correct answer for matching is the list of right-side pairs in order.
           return question.matchingPairs.map(pair => pair.right);
         }
         return question.correctAnswer || question.answer;
@@ -234,7 +233,6 @@ export default function AssignmentDetails() {
     if (question.activityType === 'Matching') {
       if (Array.isArray(userAnswer) && Array.isArray(correctAnswer)) {
         if (userAnswer.length !== correctAnswer.length) return false;
-        // Check if every user answer matches the correct answer at the same position
         return userAnswer.every((ans, i) => ans.toLowerCase().trim() === correctAnswer[i].toLowerCase().trim());
       }
       return false;

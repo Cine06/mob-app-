@@ -17,6 +17,7 @@ export default function MessageDetails() {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [currentUser, setCurrentUser] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const flatListRef = useRef();
@@ -78,7 +79,9 @@ export default function MessageDetails() {
       }).subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
     };
   }, [currentUser, receiverId]);
 
@@ -96,9 +99,11 @@ export default function MessageDetails() {
   };
 
   const sendMessage = async () => {
-    if (newMessage.trim() === "" || !currentUser || isSending) return;
+    if ((newMessage.trim() === "" && !selectedFile) || !currentUser || isSending) return;
+    if (selectedFile) {
+      return sendFile();
+    }
     const messageContent = newMessage.trim();
-    setNewMessage(""); 
     setIsSending(true);
 
     const tempId = `temp-${Date.now()}`;
@@ -111,6 +116,7 @@ export default function MessageDetails() {
       file_url: null,
     };
     setMessages(prev => [...prev, tempMessage]);
+    setNewMessage(""); 
 
     const { data, error } = await supabase
       .from("messages")
@@ -128,7 +134,7 @@ export default function MessageDetails() {
     setIsSending(false);
   };
 
-  const pickAndSendFile = async () => {
+  const pickFile = async () => {
     setDropdownVisible(false);
     const result = await DocumentPicker.getDocumentAsync({
       type: [ 
@@ -149,10 +155,33 @@ export default function MessageDetails() {
       return;
     }
 
+    setSelectedFile(file);
+  };
+
+  const sendFile = async () => {
+    if (!selectedFile) return;
     setIsSending(true);
-    Alert.alert('Uploading', 'Your file is being uploaded...');
+    
+    const tempId = `temp-file-${Date.now()}`;
+    const tempMessage = {
+      id: tempId,
+      content: newMessage.trim() || selectedFile.name,
+      content: newMessage.trim(),
+      created_at: new Date().toISOString(),
+      sender_id: currentUser.id,
+      receiver_id: receiverId,
+      file_url: null, 
+      file_name: selectedFile.name,
+      file_type: selectedFile.mimeType,
+      is_uploading: true,
+    };
+
+    setMessages(prev => [...prev, tempMessage]);
+    setSelectedFile(null);
+    setNewMessage("");
 
     try {
+      const file = selectedFile;
       const formData = new FormData();
       formData.append('file', {
         uri: file.uri,
@@ -174,18 +203,22 @@ export default function MessageDetails() {
       const fileMessage = {
         sender_id: currentUser.id,
         receiver_id: receiverId,
-        content: file.name,
+        content: newMessage.trim() || file.name, 
+        content: newMessage.trim(), 
         file_url: urlData.publicUrl,
         file_name: file.name,
         file_type: file.mimeType,
       };
 
-      const { error: insertError } = await supabase.from('messages').insert(fileMessage);
+      const { data: finalMessage, error: insertError } = await supabase.from('messages').insert(fileMessage).select().single();
       if (insertError) throw insertError;
+
+      setMessages(prev => prev.map(m => m.id === tempId ? { ...finalMessage, is_uploading: false } : m));
 
     } catch (error) {
       console.error("Error sending file:", error);
       Alert.alert("Error", "Failed to send file. Please try again.");
+      setMessages(prev => prev.filter(m => m.id !== tempId)); 
     } finally {
       setIsSending(false);
     }
@@ -224,18 +257,22 @@ export default function MessageDetails() {
         const isMyMessage = msg.sender_id === currentUser?.id;
         return (
           <View style={{ paddingBottom: 25 }}>
-          <View key={msg.id} style={isMyMessage ? styles.receiverBubble : styles.senderBubble}>
+          <View key={msg.id} style={[isMyMessage ? styles.receiverBubble : styles.senderBubble, isMyMessage && { backgroundColor: '#05642d' }]}>
             {msg.file_url ? (
               <View style={styles.fileContainer}>
-                <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center' }} onPress={() => handleFilePress(msg.file_url)}>
-                  <FontAwesome5 name="file-alt" size={24} color={isMyMessage ? 'white' : '#333'} style={{ marginRight: 8 }} />
-                  <Text style={[styles.fileText, isMyMessage ? styles.receiverText : styles.senderText, { flexShrink: 1 }]} numberOfLines={2}>{msg.file_name || 'File'}</Text>
-                </TouchableOpacity>
+                <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center' }} onPress={() => msg.file_url && handleFilePress(msg.file_url)} disabled={msg.is_uploading}>
+                  {msg.is_uploading ? (
+                    <ActivityIndicator size="small" color={isMyMessage ? 'white' : '#046a38'} style={{ marginRight: 8 }} />
+                  ) : (
+                    <FontAwesome5 name="file-alt" size={24} color={isMyMessage ? 'white' : '#333'} style={{ marginRight: 8 }} />
+                  )}
+                  <Text style={[styles.fileText, isMyMessage ? styles.receiverText : styles.senderText, isMyMessage && { color: 'white' }, { flexShrink: 1 }]} numberOfLines={2}>{msg.file_name || 'File'}</Text>
+                </TouchableOpacity> 
               </View>
             ) : (
-              <Text style={isMyMessage ? styles.receiverText : styles.senderText}>{msg.content}</Text>
+              <Text style={[isMyMessage ? styles.receiverText : styles.senderText, isMyMessage && { color: 'white' }]}>{msg.content}</Text>
             )}
-            <Text style={styles.time}>{new Date(msg.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</Text>
+            <Text style={[styles.time, { color: isMyMessage ? '#e0e0e0' : '#666' }]}>{new Date(msg.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}</Text>
             {isMyMessage && index === messages.length - 1 && msg.read && (
               <Text style={styles.readReceipt}>Read</Text>
             )}
@@ -244,41 +281,53 @@ export default function MessageDetails() {
         );
       }}
       keyExtractor={(item) => item.id.toString()}
-      style={styles.chatContainer}
+      style={[styles.chatContainer, { backgroundColor: 'white' }]}
       ref={flatListRef}
       onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
       onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
     />
     )}
 
-    
-      <View style={styles.inputContainer}>
-                  <TouchableOpacity onPress={() => setDropdownVisible(!dropdownVisible)}
-                  >
-                     <FontAwesome5 name="plus" size={20} color="green" left={10} />
-                  </TouchableOpacity>
-                  
-                  {dropdownVisible && (
-                    <View style={styles.dropdownMenu}>
-                      <TouchableOpacity 
-                        style={styles.menuItem}
-                        onPress={pickAndSendFile}
-                      >
-                        <FontAwesome5 name="paperclip" size={18} color="#046a38" />
-                        <Text style={styles.menuText}>Document</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-        <TextInput 
-          style={styles.input} 
-          placeholder="Aa" 
-          placeholderTextColor="gray" 
-          value={newMessage} 
-          onChangeText={setNewMessage}
-        />
-        <TouchableOpacity style={styles.sendButton} onPress={sendMessage} disabled={isSending}>
-          <Ionicons name="send" size={24} color="white" />
-        </TouchableOpacity>
+      <View>
+        {selectedFile ? (
+          <View style={[styles.filePreviewContainer, {backgroundColor: 'white', justifyContent: "space-between", alignItems: 'center', flexDirection: 'row'}]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, overflow: 'hidden', paddingRight: 10 }}>
+              <FontAwesome5 name="file-alt" size={20} color="#333" style={{ marginRight: 8 }} />
+              <Text style={styles.filePreviewText} numberOfLines={1}>{selectedFile.name}</Text>
+            </View>
+            <TouchableOpacity onPress={() => setSelectedFile(null)} style={{ padding: 10 }}>
+              <Ionicons name="close-circle" size={24} color="gray" />
+            </TouchableOpacity>
+          </View>
+        ) : null}
+        <View style={styles.inputContainer}>
+            <TouchableOpacity onPress={() => setDropdownVisible(!dropdownVisible)}
+            >
+                <FontAwesome5 name="plus" size={20} color="green" left={10} />
+            </TouchableOpacity>
+            
+            {dropdownVisible && (
+              <View style={styles.dropdownMenu}>
+                <TouchableOpacity 
+                  style={styles.menuItem}
+                  onPress={pickFile}
+                >
+                  <FontAwesome5 name="paperclip" size={18} color="#046a38" />
+                  <Text style={styles.menuText}>Document</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            <TextInput 
+              style={styles.input} 
+              placeholder="Aa" 
+              placeholderTextColor="gray" 
+              value={newMessage} 
+              onChangeText={setNewMessage}
+            />
+          <TouchableOpacity style={styles.sendButton} onPress={sendMessage} disabled={isSending || (newMessage.trim() === '' && !selectedFile)}>
+            <Ionicons name="send" size={24} color="white" />
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
 </KeyboardAvoidingView>

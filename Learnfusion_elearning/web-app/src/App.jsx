@@ -1,7 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Login from "./components/Login";
 
-// Admin Components
 import AdminDashboard from "./components/AdminDashboard";
 import AddUser from "./components/AddUser";
 import AdminSectionManagement from "./components/AdminSectionManagement";
@@ -9,7 +8,6 @@ import AdminManageSection from "./components/AdminManageSection";
 import AdminHandouts from "./components/AdminHandouts";
 import Unauthorized from "./components/Unauthorized";
 
-// Teacher Components
 import TeacherDashboard from "./components/TeacherDashboard";
 import Assessment from "./components/Assessment";
 import Handouts from "./components/Handouts";

@@ -31,11 +31,11 @@ export default StyleSheet.create({
       marginBottom: 10,
     },
     unreadItem: {
-      backgroundColor: '#F0FDF4', // Light green for unread items
-      borderColor: '#046a38',     // Green border for emphasis
+      backgroundColor: '#F0FDF4', 
+      borderColor: '#046a38',     
     },
     selectedItem: {
-      backgroundColor: '#E3F2FD', // Light blue for selection
+      backgroundColor: '#E3F2FD', 
       borderColor: '#2196F3',
     },
     headerText: {

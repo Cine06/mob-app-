@@ -173,7 +173,7 @@ const AdminManageSection = () => {
 
   const toggleSelectionMode = () => {
     setIsSelectionMode(prevMode => {
-      if (prevMode) { // If turning selection mode OFF
+      if (prevMode) { 
         setSelectedStudents([]);
       }
       return !prevMode;

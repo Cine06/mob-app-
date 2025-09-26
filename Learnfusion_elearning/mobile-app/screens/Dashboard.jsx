@@ -143,7 +143,7 @@ export default function Dashboard() {
           let award;
           if (student.percentage >= 100) award = { color: 'gold' };
           else if (student.percentage >= 90) award = { color: 'silver' };
-          else if (student.percentage >= 80) award = { color: '#cd7f32' }; // bronze
+          else if (student.percentage >= 80) award = { color: '#cd7f32' }; 
           
           return { ...student, rank, award, section_name: sectionData.section_name };
       });

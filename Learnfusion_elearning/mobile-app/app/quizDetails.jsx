@@ -95,7 +95,6 @@ function MatchingQuestionAnswer({ question, questionIndex, onAnswerChange, answe
                 }}
                 onPress={() => {
                   if (isCompleted) return;
-                  // Find first empty slot
                   const emptySlotIndex = slots.findIndex(slot => !slot);
                   if (emptySlotIndex !== -1) {
                     handleSlotChange(emptySlotIndex, choice);
@@ -375,7 +374,6 @@ const QuizDetails = () => {
       return userAnswerString.toLowerCase().trim() === correctAnswer.toLowerCase().trim();
     }
     
-    // For other question types, compare strings
     return userAnswer.toString().toLowerCase().trim() === correctAnswer.toLowerCase().trim();
   };
 
@@ -420,6 +418,7 @@ const QuizDetails = () => {
             title: 'Error',
             headerStyle: { backgroundColor: '#046a38' },
             headerTintColor: '#fff',
+            headerTitleAlign: 'center',
           }} 
         />
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f5f5f5', padding: 20 }}>
@@ -451,6 +450,7 @@ const QuizDetails = () => {
             title: 'Quiz Not Found',
             headerStyle: { backgroundColor: '#046a38' },
             headerTintColor: '#fff',
+            headerTitleAlign: 'center',
           }} 
         />
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f5f5f5', padding: 20 }}>
@@ -481,6 +481,7 @@ const QuizDetails = () => {
             title: quizData.title || 'Quiz',
             headerStyle: { backgroundColor: '#046a38' },
             headerTintColor: '#fff',
+            headerTitleAlign: 'center',
           }} 
         />
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f5f5f5', padding: 20 }}>
@@ -511,6 +512,7 @@ const QuizDetails = () => {
           title: quizData.title || 'Assessment',
           headerStyle: { backgroundColor: '#046a38' },
           headerTintColor: '#fff',
+          headerTitleAlign: 'center',
         }} 
       />
       

@@ -128,7 +128,7 @@ const AdminSectionManagement = () => {
 
   const toggleSelectionMode = () => {
     setIsSelectionMode(prevMode => {
-      if (prevMode) { // If turning selection mode OFF
+      if (prevMode) { 
         setSelectedSections([]);
       }
       return !prevMode;

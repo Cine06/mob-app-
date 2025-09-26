@@ -287,7 +287,7 @@ const AdminHandouts = () => {
 
   const toggleSelectionMode = () => {
     setIsSelectionMode(prevMode => {
-      if (prevMode) { // If turning selection mode OFF
+      if (prevMode) { 
         setSelectedHandouts([]);
       }
       return !prevMode;
