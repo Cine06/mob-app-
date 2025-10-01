@@ -97,12 +97,12 @@ const AdminSectionManagement = () => {
   const handleArchiveSection = async (section) => {
     const result = await Swal.fire({
       title: "Are you sure?",
-      text: "You want to archive this section? It will be removed but can be restored later.",
+      text: "You want to remove this section?",
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#d33",
       cancelButtonColor: "#3085d6",
-      confirmButtonText: "Yes, archive it!",
+      confirmButtonText: "Yes, remove it!",
     });
 
     if (result.isConfirmed) {
@@ -117,7 +117,7 @@ const AdminSectionManagement = () => {
         if (deleteError) {
           Swal.fire("Error!", `Section archived but failed to delete: ${deleteError.message}`, "error");
         } else {
-          Swal.fire("Archived!", "The section has been archived.", "success");
+          Swal.fire("Removed!", "The section has been removed.", "success");
           fetchSections();
         }
       } else {
@@ -160,12 +160,12 @@ const AdminSectionManagement = () => {
 
     const result = await Swal.fire({
       title: `Are you sure?`,
-      text: `You want to archive these ${selectedSections.length} sections? They can be restored later.`,
+      text: `You want to remove these ${selectedSections.length} sections?`,
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#d33",
       cancelButtonColor: "#3085d6",
-      confirmButtonText: "Yes, archive them!",
+      confirmButtonText: "Yes, remove them!",
     });
 
     if (result.isConfirmed) {
@@ -270,9 +270,9 @@ const AdminSectionManagement = () => {
               className="select-multiple-btn"
               onClick={toggleSelectionMode}
             >
-              {isSelectionMode ? 'Cancel' : 'Archive'}
+              {isSelectionMode ? 'Cancel' : 'Remove'}
             </button>
-            {isSelectionMode && selectedSections.length > 0 && (
+            {isSelectionMode && (
               <button
                 className="archive-btn"
                 onClick={handleArchiveSelected}
@@ -323,7 +323,7 @@ const AdminSectionManagement = () => {
                             <button
                               className="archive-btn"
                               onClick={() => handleArchiveSection(section)}
-                              title="Archive Section"
+                              title="Remove Section"
                             >
                               <FaArchive/>
                             </button>

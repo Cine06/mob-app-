@@ -7,39 +7,41 @@
 }
   
 .form-container {
-    width: 700px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    text-align: center;
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start; /* Align to top for scrolling on small screens */
+  padding: 20px;
+  overflow-y: auto;
 }
   
 .add-user-form {
-    margin-left: 675px;
-    background: white;
-    padding: 30px;
-    border-radius: 10px;
-    box-shadow: 0 4px 8px #0000001a;
-    text-align: left;
+  background: white;
+  padding: 30px;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  text-align: left;
+  width: 100%;
+  max-width: 600px;
+  margin-top: 20px;
 }
   
 .add-user-form label {
-    font-weight: bold;
-    margin-top: 14px;
-    display: block;
-    margin-left: 381px;
+  font-weight: bold;
+  margin-top: 14px;
+  display: block;
+  text-align: left;
 }
   
 .add-user-form input,
 .add-user-form select {
-    width: 500px;
-    padding: 10px;
-    margin-top: 5px;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-    font-size: 14px;
-    margin-right: 381px;
-    margin-left: 381px;
+  width: 100%;
+  padding: 10px;
+  margin-top: 5px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  font-size: 14px;
+  box-sizing: border-box; /* Important for width: 100% */
 }
   
 .form-actions {
@@ -215,5 +217,24 @@
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+/* Responsive adjustments for AddUser form */
+@media (max-width: 768px) {
+  .form-container {
+    padding: 15px;
+    padding-top: 80px; /* Space for the sidebar toggle */
+    align-items: flex-start;
+  }
+
+  .add-user-form {
+    padding: 20px;
+    margin-top: 0;
+  }
+
+  .form-actions {
+    flex-direction: column;
+    gap: 0.5rem;
   }
 }

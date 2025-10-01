@@ -1,95 +1,243 @@
-.login-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh; 
-  background-color: #f5f5f5;
-  gap: 0; 
+:root {
+  --primary-green: #05642d;
+  --primary-green-dark: #0a7c3a;
+  --primary-orange: #ffa500;
+  --primary-orange-dark: #e69500;
+  --text-dark: #333;
+  --text-light: #fff;
+  --border-color: #ccc;
+  --background-light: #fff;
+  --background-error: #f8d7da;
+  --text-error: #dc3545;
+  --shadow-color: rgba(5, 100, 45, 0.1);
 }
 
-.login-left, .login-right {
-  height: 200px; 
+.login-container {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: var(--background-light);
 }
 
 .login-left {
-  background-color: #05642d;
-  padding: 120px; 
-  border-radius: 10px 0 0 10px;
-  color: white;
+  background: linear-gradient(to bottom right, var(--primary-green), var(--primary-green-dark));
+  background-image: linear-gradient(to bottom right, var(--primary-green), var(--primary-green-dark)), url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  color: var(--text-light);
   text-align: center;
-  width: 350px;
-  height: 340px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  display: flex;
+  -ms-flex-direction: column;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  flex: 0 0 50%; 
+  padding: 40px;
 }
 
 .logo {
-  margin-top: 60px;
-  width: 100px;
+  width: 140px;
   margin-bottom: 15px;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+  align-items: center;
 }
 
 .tagline {
   color: #ffa500;
-  font-size: 16px;
+  font-size: 1.1rem;
   font-weight: bold;
   margin-top: 10px;
+  max-width: 300px;
 }
 
 .login-right {
-  background: white;
-  padding: 40px;
-  border-radius: 0 10px 10px 0;
-  width: 350px;
-  height: 500px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  background: var(--background-light);
   display: flex;
-  flex-direction: column;
   justify-content: center;
+  align-items: center; 
+  flex: 1; 
+  padding: 40px;
+  overflow-y: auto; 
+}
+
+.login-form-wrapper {
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  -ms-flex-direction: column;
+  flex-direction: column;
+  animation: formFadeIn 0.5s ease-out forwards;
 }
 
 .brand-title {
   text-align: center;
-  font-size: 24px;
+  font-size: 2.5rem;
   font-weight: bold;
+  margin-bottom: 2rem;
 }
 
-.highlights {
+.highlight { 
   color: #ffa500;
+}
+.fusion {
+  color: var(--primary-green);
 }
 
 .login-form {
   display: flex;
+  -ms-flex-direction: column;
   flex-direction: column;
+  width: 100%;
+  gap: 0.5rem; 
 }
 
 .login-form label {
   font-weight: bold;
-  margin-top: 10px;
+  font-size: 0.875rem;
+  color: #333;
+  margin-top: 0.5rem; 
 }
 
-.login-form input, .login-form select {
-  padding: 12px;
+.login-form input {
+  padding: 16px;
   margin-top: 5px;
-  border-radius: 5px;
-  border: 1px solid #ccc;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  font-size: 1rem;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.login-form input {
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  font-size: 1rem;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
+.login-form input:focus {
+  outline: none;
+  border-color: var(--primary-green);
+  box-shadow: 0 0 0 3px var(--shadow-color);
+}
+
+.password-input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-input-container input {
+  width: 100%;
+  padding-right: 50px;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 15px;
+  border: none;
+  bottom: 5px;
+  background: transparent !important;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6c757d;
+  font-size: 1.25rem;
+  transition: none;
+}
+
+.password-toggle-btn:hover,
+.password-toggle-btn:active,
+.password-toggle-btn:focus,
+.password-toggle-btn:focus-visible {
+  background: transparent !important;
+  outline: none;
+  box-shadow: none;
+  color: #6c757d; 
+}
+
+.form-options {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.75rem;
+}
 
 .button-container {
-  margin-top: 20px;
+  margin-top: 1rem;
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
 }
 
 .login-btn{
-  padding: 12px;
-  width: 48%;
+  padding: 12px 20px;
+  width: 100%;
   border: none;
-  border-radius: 5px;
+  border-radius: 8px;
   cursor: pointer;
   font-weight: bold;
-  margin-left: 85px;
-  background-color: #ffa500;
-  color: white;
+  font-size: 1rem;
+  background-color: var(--primary-orange);
+  color: var(--text-light);
+  transition: background-color 0.3s ease, transform 0.2s ease;
 }
 
+.login-btn:hover:not(:disabled) {
+  background-color: var(--primary-orange-dark);
+  transform: translateY(-2px);
+}
+
+.login-btn:disabled {
+  background-color: var(--border-color);
+  cursor: not-allowed;
+}
+
+.login-error-message {
+  color: var(--text-error);
+  background-color: var(--background-error);
+  border: 1px solid var(--text-error);
+  padding: 10px;
+  border-radius: 8px;
+  text-align: center;
+  margin-top: 1.5rem;
+  font-weight: 500;
+}
+
+@media (max-width: 900px) {
+  .login-container {
+    flex-direction: column;
+  }
+
+  .login-left {
+    flex: none; 
+    height: 30vh;
+    min-height: 200px;
+    padding: 20px;
+  }
+
+  .login-right {
+    flex: 1; 
+    justify-content: flex-start;
+    padding: 30px 20px;
+    align-items: center;
+  }
+
+  .login-form-wrapper {
+    max-width: 450px;
+    width: 100%;
+  }
+
+  .login-form input {
+    padding: 14px 16px; 
+    font-size: 16px; 
+  }
+}
+
+@keyframes formFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

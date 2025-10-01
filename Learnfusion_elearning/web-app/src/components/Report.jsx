@@ -6,6 +6,7 @@ import Swal from 'sweetalert2';
 import Sidebar from "./Sidebar";
 import { supabase } from "../utils/supabaseClient"; 
 import { useAuth } from "../context/AuthContext";
+import iccLogo from "/icclogo.png";
 import "../styles/report.css"; 
 
 const Report = () => {
@@ -192,17 +193,9 @@ const Report = () => {
     const schoolName = "Interface Computer College";
     const reportTitle = `Report for '${lessonName}' - Section: ${sectionName}`;
     const logoColor = [5, 100, 45]; 
-
-    const loadImage = (src) => new Promise((resolve, reject) => {
-      const img = new Image();
-      img.src = src;
-      img.onload = () => resolve(img);
-      img.onerror = (err) => reject(err);
-    });
-
+    
     try {
-      const logo = await loadImage('/icclogo.png');
-      doc.addImage(logo, 'PNG', 10, 10, 30, 30);
+      doc.addImage(iccLogo, 'PNG', 10, 10, 30, 30);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(20);
       doc.setTextColor(...logoColor);
@@ -324,7 +317,7 @@ const Report = () => {
                 Next
               </button>
             </div>
-            <button className="download-pdf" onClick={generatePDF} disabled={loading}>Download PDF</button>
+            <button className="back" onClick={generatePDF} disabled={loading}>Download PDF</button>
           </div>
         </div>
         </>

@@ -4,6 +4,7 @@
   min-height: 100vh;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   margin-left: 250px;
+  transition: margin-left 0.3s ease;
 }
 
 .assessment-header {
@@ -276,6 +277,11 @@
   z-index: 100;
 }
 
+.overlay .modal-content {
+  margin-left: 0; /* Override margin for modal inside overlay */
+}
+
+
 .handout-tabs-container {
   display: flex;
   gap: 10px;
@@ -305,7 +311,8 @@
 }
 
 .assessment-list-by-handout {
-  display: grid;
+  display: -ms-grid;                  
+  display: grid;       
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 15px;
 }
@@ -466,4 +473,24 @@
 .confirmation-actions .cancel-btn {
   background-color: #e5e7eb;
   color: #374151;
+}
+
+@media (max-width: 768px) {
+  .assessment-container {
+    margin-left: 0;
+    padding: 20px;
+    padding-top: 70px;
+  }
+
+  .assessment-upper-section {
+    flex-direction: column;
+  }
+
+  .tab-toggle {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .add-btn {
+    width: 100%;
+  }
 }

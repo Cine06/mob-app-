@@ -3,6 +3,7 @@
     height: 100vh;
     overflow: hidden; 
     margin-left: 255px;
+    transition: margin-left 0.3s ease;
   }
   
   .detailed-chat-main {
@@ -306,3 +307,10 @@
   color: #aaa;
   cursor: not-allowed;
 }
+
+@media (max-width: 768px) {
+  .detailed-chat-container {
+    margin-left: 0;
+  }
+}
+

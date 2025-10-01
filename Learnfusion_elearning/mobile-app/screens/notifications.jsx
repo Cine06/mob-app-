@@ -298,66 +298,70 @@ export default function Notifications() {
   );
 };
 
+const SelectionHeader = ({ onCancel, selectedCount, onSelectAll, isAllSelected, onDelete }) => (
+  <View style={{ 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between', 
+    paddingHorizontal: 10, 
+    paddingVertical: 8,
+    width: '100%'
+  }}>
+    <TouchableOpacity onPress={onCancel}>
+      <Ionicons name="close" size={24} color="#333" />
+    </TouchableOpacity>
+
+    <Text style={styles.headerText}>
+      {selectedCount} Selected
+    </Text>
+
+    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      <TouchableOpacity onPress={onSelectAll} style={{ marginRight: 20 }}>
+        <MaterialIcons 
+          name={isAllSelected ? "deselect" : "select-all"} 
+          size={24} 
+          color="#333" 
+        />
+      </TouchableOpacity>
+      <TouchableOpacity onPress={onDelete}>
+        <FontAwesome5 name="trash" size={20} color="red" />
+      </TouchableOpacity>
+    </View>
+  </View>
+);
+
+const DefaultHeader = ({ onEnableSelection }) => (
+  <View style={{ 
+    flexDirection: "row", 
+    alignItems: "center", 
+    justifyContent: "space-between",
+    paddingHorizontal: 10, 
+    marginBottom: 10,
+    width: '100%'
+  }}>
+    <Text style={styles.header}>Notifications</Text>
+    <TouchableOpacity onPress={onEnableSelection}>
+      <FontAwesome5 name="trash-alt" size={20} color="red" />
+    </TouchableOpacity>
+  </View>
+);
 
   return (
     <>
     <Stack.Screen options={{ headerShown: false }} />
      <Stack.Screen options={{ title: "Notifications" }} />
       <View style={styles.container}> 
-        <View style={[styles.header]}>
+        <View style={styles.headerContainer}>
           {selectionMode ? (
-            <>
-              <View style={{ 
-  flexDirection: 'row', 
-  alignItems: 'center', 
-  justifyContent: 'space-between', 
-  paddingHorizontal: 10, 
-  paddingVertical: 8,
-}}>
-  <TouchableOpacity 
-    onPress={() => { 
-      setSelectionMode(false); 
-      setSelectedNotifications(new Set()); 
-    }}
-  >
-    <Ionicons name="close" size={24} color="#333" />
-  </TouchableOpacity>
-
-  <Text style={styles.headerText}>
-    {selectedNotifications.size} Selected
-  </Text>
-
-  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-    <TouchableOpacity onPress={handleSelectAll} style={{ marginRight: 20 }}>
-      <MaterialIcons 
-        name={isAllSelected ? "deselect" : "select-all"} 
-        size={24} 
-        color="#333" 
-      />
-    </TouchableOpacity>
-    <TouchableOpacity onPress={handleDeleteSelected}>
-      <FontAwesome5 name="trash" size={20} color="red" />
-    </TouchableOpacity>
-  </View>
-</View>
-
-            </>
+            <SelectionHeader 
+              selectedCount={selectedNotifications.size}
+              isAllSelected={isAllSelected}
+              onCancel={() => { setSelectionMode(false); setSelectedNotifications(new Set()); }}
+              onSelectAll={handleSelectAll}
+              onDelete={handleDeleteSelected}
+            />
           ) : (
-            <>
-              <View style={{ 
-  flexDirection: "row", 
-  alignItems: "center", 
-  justifyContent: "space-between",
-  paddingHorizontal: 10, 
-  marginBottom: 10 
-}}>
-  <Text style={styles.header}>Notifications</Text>
-  <TouchableOpacity onPress={() => setSelectionMode(true)}>
-    <FontAwesome5 name="trash-alt" size={20} color="red" />
-  </TouchableOpacity>
-</View>
-
-            </>
+            <DefaultHeader onEnableSelection={() => setSelectionMode(true)} />
           )}
         </View>
 

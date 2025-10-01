@@ -6,12 +6,11 @@
   import { useAuth } from "../context/AuthContext";
   import { archiveRecord } from "../utils/archiveService";
   import Swal from 'sweetalert2';
-  import "sweetalert2/dist/sweetalert2.min.css";
   import "../styles/AdminDashboard.css";
 
   const AdminDashboard = () => {
     const navigate = useNavigate();
-    const { user: adminUser } = useAuth();
+    const { user: adminUser, setUser } = useAuth();
     const [users, setUsers] = useState([]);
     const [filteredUsers, setFilteredUsers] = useState([]);
     const [searchTerm, setSearchTerm] = useState("");
@@ -76,12 +75,12 @@
     const handleArchiveUser = async (user) => {
       const result = await Swal.fire({
         title: "Are you sure?",
-        text: "You want to archive this user? They will be removed from the active list but can be restored later.",
+        text: "You want to remove this user?.",
         icon: "warning",
         showCancelButton: true,
         confirmButtonColor: "#d33",
         cancelButtonColor: "#3085d6",
-        confirmButtonText: "Yes, archive it!",
+        confirmButtonText: "Yes, remove it!",
       });
   
       if (result.isConfirmed) {
@@ -97,7 +96,7 @@
             console.error("Error deleting user after archiving:", deleteError);
             Swal.fire("Error!", `User was archived, but failed to be removed from the active list. Error: ${deleteError.message}`, "error");
           } else {
-            Swal.fire("Archived!", "User archived successfully.", "success");
+            Swal.fire("Removed!", "User removed successfully.", "success");
             fetchUsers();
           }
         } else {
@@ -135,18 +134,18 @@
 
     const handleArchiveSelected = async () => {
       if (selectedUsers.length === 0) {
-        Swal.fire("No users selected", "Please select users to archive.", "info");
+        Swal.fire("No users selected", "Please select users to remove.", "info");
         return;
       }
   
       const result = await Swal.fire({
         title: `Are you sure?`,
-        text: `You want to archive these ${selectedUsers.length} users? They will be removed from the active list but can be restored later.`,
+        text: `You want to remove these ${selectedUsers.length} users?`,
         icon: "warning",
         showCancelButton: true,
         confirmButtonColor: "#d33",
         cancelButtonColor: "#3085d6",
-        confirmButtonText: "Yes, archive them!",
+        confirmButtonText: "Yes, remove them!",
       });
   
       if (result.isConfirmed) {
@@ -168,7 +167,7 @@
           if (deleteError) archiveErrors.push(`Error removing archived users: ${deleteError.message}`);
         }
   
-        Swal.fire("Process Complete", `${successfullyArchivedIds.length} users archived. ${archiveErrors.length} failed.`, archiveErrors.length > 0 ? "warning" : "success");
+        Swal.fire("Process Complete", `${successfullyArchivedIds.length} users removed. ${archiveErrors.length} failed.`, archiveErrors.length > 0 ? "warning" : "success");
         fetchUsers();
         setIsSelectionMode(false);
       }
@@ -218,9 +217,15 @@
     const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
     const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
 
+    const handleLogout = () => {
+      localStorage.clear();
+      setUser(null);
+      navigate("/", { replace: true });
+    };
+
     return (
       <div className="dashboard-container">
-        <AdminSidebar />
+        <AdminSidebar onLogout={handleLogout} />
         <main className="dashboard-content">
           <h2 className="dashboard-title">Account Management</h2>
 
@@ -252,9 +257,9 @@
           className="select-multiple-btn"
           onClick={toggleSelectionMode}
         >
-          {isSelectionMode ? 'Cancel' : 'Archive'}
+          {isSelectionMode ? 'Cancel' : 'Remove'}
         </button>
-        {isSelectionMode && selectedUsers.length > 0 && (
+        {isSelectionMode && (
           <button
             className="archive-btn"
             onClick={handleArchiveSelected}
@@ -330,7 +335,7 @@
               <button
                 className="archive-btn"
                 onClick={() => handleArchiveUser(user)}
-                title="Archive User"
+                title="Remove User"
               >
                 <FaArchive />
               </button>

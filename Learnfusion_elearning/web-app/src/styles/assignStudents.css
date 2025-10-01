@@ -1,10 +1,9 @@
 .assign-students-container {
-  display: flex;
   flex-direction: column;
-  margin-left: 250px;
   padding: 2rem;
   background-color: #f9f9f9;
   min-height: 100vh;
+  flex: 1;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
@@ -139,11 +138,11 @@
 
 @media (max-width: 768px) {
   .assign-students-container {
-    margin-left: 0;
     padding: 1rem;
+    padding-top: 70px; /* Space for sidebar toggle */
   }
 
-  .section-title {
+  .section-titles {
     font-size: 1.5rem;
   }
 
@@ -155,6 +154,10 @@
   .assign-controls {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .upload-csv-btn {
+    width: 100%;
   }
 
   .assign-pagination {

@@ -27,7 +27,8 @@
 
 .lessons-container,
 .lessons-grid {
-  display: grid;
+  display: -ms-grid;                  
+  display: grid;       
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 1.5rem;
 }
@@ -195,6 +196,7 @@ button {
   flex: 1;
   padding: 20px;
   overflow-y: auto;
+  transition: margin-left 0.3s ease;
   background-color: #f9f9f9;
 }
 
@@ -232,6 +234,13 @@ button {
   width: 400px;
   transition: all 0.3s ease;
 }
+.action-buttons {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px; 
+}
+
 
 .search-bar:focus {
   outline: none;

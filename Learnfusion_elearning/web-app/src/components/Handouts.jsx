@@ -598,7 +598,7 @@ const Handouts = () => {
 
           {!user?.id && (
             <div style={{ textAlign: 'center', padding: '20px' }}>
-              <p style={{ color: 'orange' }}>🔒 Please log in to view handouts.</p>
+              <p style={{ color: 'orange' }}>Please log in to view handouts.</p>
             </div>
           )}
           {user?.id && !teacherInfo?.id && (

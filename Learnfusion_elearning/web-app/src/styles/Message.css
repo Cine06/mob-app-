@@ -261,6 +261,7 @@
 @media (max-width: 768px) {
   .message-container {
     margin-left: 0;
+    padding-top: 70px;
     padding: 1rem;
   }
 

@@ -100,7 +100,7 @@ const AdminManageSection = () => {
   const handleRemoveStudent = async (studentId) => {
     const result = await Swal.fire({
       title: "Are you sure?",
-      text: "You want to remove this student from the section? This action will not delete their account.",
+      text: "You want to remove this student from the section?",
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#d33",
@@ -126,13 +126,13 @@ const AdminManageSection = () => {
 
   const handleArchiveStudent = async (student) => {
     const result = await Swal.fire({
-      title: "Are you sure you want to archive this student?",
-      text: "This will remove their account entirely and they will no longer be accessible in the system. This action can be reversed later.",
+      title: "Are you sure you want to remove this student?",
+      text: "This will remove their account.",
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#d33",
       cancelButtonColor: "#3085d6",
-      confirmButtonText: "Yes, archive student!",
+      confirmButtonText: "Yes, remove student!",
     });
 
     if (result.isConfirmed) {
@@ -147,7 +147,7 @@ const AdminManageSection = () => {
         if (deleteError) {
           Swal.fire("Error!", `Student archived but failed to delete: ${deleteError.message}`, "error");
         } else {
-          Swal.fire("Archived!", "The student's account has been archived.", "success");
+          Swal.fire("Removed!", "The student's account has been removed.", "success");
           fetchSectionDetails();
         }
       } else {
@@ -205,7 +205,7 @@ const AdminManageSection = () => {
 
     const result = await Swal.fire({
       title: `Are you sure?`,
-      text: `You want to remove these ${selectedStudents.length} students from this section? Their accounts will not be deleted.`,
+      text: `You want to remove these ${selectedStudents.length} students from this section?`,
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#d33",
@@ -230,18 +230,18 @@ const AdminManageSection = () => {
 
   const handleArchiveSelected = async () => {
     if (selectedStudents.length === 0) {
-      Swal.fire("No students selected", "Please select students to archive.", "info");
+      Swal.fire("No students selected", "Please select students to remove.", "info");
       return;
     }
 
     const result = await Swal.fire({
       title: `Are you sure?`,
-      text: `You want to archive these ${selectedStudents.length} students? This will remove their accounts entirely.`,
+      text: `You want to remove these ${selectedStudents.length} students? This will remove their accounts entirely.`,
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#d33",
       cancelButtonColor: "#3085d6",
-      confirmButtonText: "Yes, archive them!",
+      confirmButtonText: "Yes, remove them!",
     });
 
     if (result.isConfirmed) {
@@ -263,7 +263,7 @@ const AdminManageSection = () => {
         if (deleteError) archiveErrors.push(`Error removing archived students: ${deleteError.message}`);
       }
 
-      Swal.fire("Process Complete", `${successfullyArchivedIds.length} students archived. ${archiveErrors.length} failed.`, archiveErrors.length > 0 ? "warning" : "success");
+      Swal.fire("Process Complete", `${successfullyArchivedIds.length} students removed. ${archiveErrors.length} failed.`, archiveErrors.length > 0 ? "warning" : "success");
       fetchSectionDetails();
       setIsSelectionMode(false);
       setSelectedStudents([]);
@@ -317,9 +317,9 @@ const AdminManageSection = () => {
             className="select-multiple-btn"
             onClick={toggleSelectionMode}
           >
-            {isSelectionMode ? 'Cancel' : 'Archive'}
+            {isSelectionMode ? 'Cancel' : 'Remove'}
           </button>
-          {isSelectionMode && selectedStudents.length > 0 && (
+          {isSelectionMode && (
             <button
               className="archive-btn"
               onClick={handleArchiveSelected}
@@ -327,7 +327,7 @@ const AdminManageSection = () => {
               <FaArchive /> ({selectedStudents.length})
             </button>
           )}
-          {isSelectionMode && selectedStudents.length > 0 && (
+          {isSelectionMode && (
             <button
               className="remove-btn"
               onClick={handleRemoveSelectedFromSection}
@@ -381,7 +381,7 @@ const AdminManageSection = () => {
                         <button
                           className="archive-btn"
                           onClick={() => handleArchiveStudent(student)}
-                          title="Archive Student Account"
+                          title="Remove Student Account"
                         >
                           <FaArchive />
                         </button>

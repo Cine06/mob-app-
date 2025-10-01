@@ -476,7 +476,7 @@ const AssignStudents = () => {
   };
 
   return (
-    <div className="assign-students-container">
+    <div className="dashboard-container assign-students-container">
       <Sidebar />
       <h2 className="section-titles">
         Assign Students to Section: <span className="highlight">{sectionName}</span>

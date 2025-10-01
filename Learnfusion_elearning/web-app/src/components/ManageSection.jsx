@@ -589,7 +589,7 @@ const paginate = (pageNumber) => {
   const handleRemoveStudent = async (studentId) => {
     const result = await Swal.fire({
       title: 'Are you sure?',
-      text: "This will remove the student from this section, but it will not delete or archive their account.",
+      text: "This will remove the student from this section.",
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#d33',
@@ -615,13 +615,13 @@ const paginate = (pageNumber) => {
 
   const handleArchiveStudent = async (student) => {
     const result = await Swal.fire({
-      title: "Are you sure you want to archive this student?",
-      text: "This will archive their account, and they will no longer be accessible in the system. This action can be reversed later.",
+      title: "Are you sure you want to remove this student?",
+      text: "This will remove their account, and they will no longer be accessible in the system.",
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#d33",
       cancelButtonColor: "#3085d6",
-      confirmButtonText: "Yes, archive student!",
+      confirmButtonText: "Yes, remove student!",
     });
 
     if (result.isConfirmed) {
@@ -636,7 +636,7 @@ const paginate = (pageNumber) => {
         if (deleteError) {
           Swal.fire("Error!", `Student archived but failed to delete: ${deleteError.message}`, "error");
         } else {
-          Swal.fire("Archived!", "The student's account has been archived.", "success");
+          Swal.fire("Removed!", "The student's account has been removed.", "success");
           fetchSectionDetails();
         }
       } else {
@@ -674,18 +674,18 @@ const paginate = (pageNumber) => {
 
   const handleArchiveSelected = async () => {
     if (selectedStudents.length === 0) {
-      Swal.fire("No students selected", "Please select students to archive.", "info");
+      Swal.fire("No students selected", "Please select students to remove.", "info");
       return;
     }
 
     const result = await Swal.fire({
       title: `Are you sure?`,
-      text: `You want to archive these ${selectedStudents.length} students? Their accounts will be archived.`,
+      text: `You want to remove these ${selectedStudents.length} students? Their accounts will be removed.`,
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#d33",
       cancelButtonColor: "#3085d6",
-      confirmButtonText: "Yes, archive them!",
+      confirmButtonText: "Yes, remove them!",
     });
 
     if (!result.isConfirmed) return;
@@ -695,7 +695,7 @@ const paginate = (pageNumber) => {
       await archiveRecord("users", student, user.id);
     }
     await supabase.from("users").delete().in("id", selectedStudents);
-    Swal.fire("Archived!", `${selectedStudents.length} students have been archived.`, "success");
+    Swal.fire("Removed!", `${selectedStudents.length} students have been removed.`, "success");
     fetchSectionDetails();
     setIsSelectionMode(false);
   };
@@ -728,7 +728,7 @@ const paginate = (pageNumber) => {
             className="select-multiple-btn"
             onClick={toggleSelectionMode}
           >
-            {isSelectionMode ? 'Cancel' : 'Archive'}
+            {isSelectionMode ? 'Cancel' : 'Remove'}
           </button>
           {isSelectionMode && selectedStudents.length > 0 && (
             <button
@@ -813,7 +813,7 @@ const paginate = (pageNumber) => {
                       <button className="remove-btn" onClick={(e) => { e.stopPropagation(); handleRemoveStudent(student.id); }} title="Remove from Section">
                         <FaUserMinus />
                       </button>{' '}
-                      <button className="archive-btn" onClick={(e) => { e.stopPropagation(); handleArchiveStudent(student); }} title="Archive Student Account">
+                      <button className="archive-btn" onClick={(e) => { e.stopPropagation(); handleArchiveStudent(student); }} title="Remove Student Account">
                         <FaArchive />
                       </button>                      
                     </td>

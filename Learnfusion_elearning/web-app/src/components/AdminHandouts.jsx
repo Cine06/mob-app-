@@ -252,12 +252,12 @@ const AdminHandouts = () => {
   const handleArchiveHandout = async (handout) => {
     const result = await Swal.fire({
       title: "Are you sure?",
-      text: "You want to archive this handout? It can be restored later.",
+      text: "You want to remove this handout?",
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#d33",
       cancelButtonColor: "#3085d6",
-      confirmButtonText: "Yes, archive it!",
+      confirmButtonText: "Yes, remove it!",
     });
 
     if (result.isConfirmed) {
@@ -273,8 +273,8 @@ const AdminHandouts = () => {
           Swal.fire("Error!", `Handout archived but failed to delete: ${deleteError.message}`, "error");
         } else {
           Swal.fire(
-            "Archived!",
-            "The handout has been archived.",
+            "Removed!",
+            "The handout has been removed.",
             "success"
           );
           fetchHandouts();
@@ -313,18 +313,18 @@ const AdminHandouts = () => {
 
   const handleArchiveSelected = async () => {
     if (selectedHandouts.length === 0) {
-      Swal.fire("No handouts selected", "Please select handouts to archive.", "info");
+      Swal.fire("No handouts selected", "Please select handouts to remove.", "info");
       return;
     }
 
     const result = await Swal.fire({
       title: `Are you sure?`,
-      text: `You want to archive these ${selectedHandouts.length} handouts? They can be restored later.`,
+      text: `You want to remove these ${selectedHandouts.length} handouts?`,
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#d33",
       cancelButtonColor: "#3085d6",
-      confirmButtonText: "Yes, archive them!",
+      confirmButtonText: "Yes, remove them!",
     });
 
     if (result.isConfirmed) {
@@ -339,7 +339,7 @@ const AdminHandouts = () => {
       }
 
       if (successfullyArchivedIds.length > 0) await supabase.from("handouts").delete().in("id", successfullyArchivedIds);
-      Swal.fire("Process Complete", `${successfullyArchivedIds.length} handouts archived. ${archiveErrors.length} failed.`, archiveErrors.length > 0 ? "warning" : "success");
+      Swal.fire("Process Complete", `${successfullyArchivedIds.length} handouts removed. ${archiveErrors.length} failed.`, archiveErrors.length > 0 ? "warning" : "success");
       fetchHandouts();
       setIsSelectionMode(false);
     }
@@ -441,9 +441,9 @@ const AdminHandouts = () => {
                 className="select-multiple-btn"
                 onClick={toggleSelectionMode}
               >
-                {isSelectionMode ? 'Cancel' : 'Archive'}
+                {isSelectionMode ? 'Cancel' : 'Remove'}
               </button>
-              {isSelectionMode && selectedHandouts.length > 0 && (
+              {isSelectionMode && (
                 <button
                   className="archive-btn"
                   onClick={handleArchiveSelected}
@@ -527,14 +527,15 @@ const AdminHandouts = () => {
                         {new Date(handout.created_at).toLocaleDateString()}
                       </td>
                       <td>
-                        <button className="edit-btn" onClick={() => openModal(handout)}><FaUserEdit/></button>
-                        <>  </>
-                        <button
-                          className="archive-btn"
-                          onClick={() => handleArchiveHandout(handout)}
-                          title="Archive Handout">
-                          <FaArchive/>
-                        </button>
+                        <div className="action-buttons">
+                          <button className="edit-btn" onClick={() => openModal(handout)} title="Edit Handout"><FaUserEdit/></button>
+                          <button
+                            className="archive-btn"
+                            onClick={() => handleArchiveHandout(handout)}
+                            title="Remove Handout">
+                            <FaArchive/>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))

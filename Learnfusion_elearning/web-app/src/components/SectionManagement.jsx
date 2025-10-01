@@ -116,7 +116,7 @@ const SectionManagement = () => {
         icon: "error",
         title: "Oops...",
         text: "An unexpected error occurred. Please try again.",
-      });
+      }); 
     }
   };
 
@@ -129,12 +129,12 @@ const SectionManagement = () => {
 
     const result = await Swal.fire({
       title: "Are you sure?",
-      text: "You want to archive this section? It can be restored later.",
+      text: "You want to remove this section?.",
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#d33",
       cancelButtonColor: "#3085d6",
-      confirmButtonText: "Yes, archive it!",
+      confirmButtonText: "Yes, remove it!",
     });
     if (result.isConfirmed) {
       const { success, error: archiveError } = await archiveRecord("sections", sectionToArchive, user.id);
@@ -145,7 +145,7 @@ const SectionManagement = () => {
           Swal.fire("Error!", `Section archived but failed to delete from active list: ${deleteError.message}`, "error");
         } else {
           setSections(sections.filter((section) => section.id !== sectionId));
-          Swal.fire("Archived!", "The section has been archived.", "success");
+          Swal.fire("Removed!", "The section has been removed.", "success");
         }
       } else {
         console.error("Error archiving section:", archiveError.message);
@@ -182,18 +182,18 @@ const SectionManagement = () => {
 
   const handleArchiveSelected = async () => {
     if (selectedSections.length === 0) {
-      Swal.fire("No sections selected", "Please select sections to archive.", "info");
+      Swal.fire("No sections selected", "Please select sections to remove.", "info");
       return;
     }
 
     const result = await Swal.fire({
       title: `Are you sure?`,
-      text: `You want to archive these ${selectedSections.length} sections? They can be restored later.`,
+      text: `You want to remove these ${selectedSections.length} sections?`,
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#d33",
       cancelButtonColor: "#3085d6",
-      confirmButtonText: "Yes, archive them!",
+      confirmButtonText: "Yes, remove them!",
     });
 
     if (!result.isConfirmed) return;
@@ -203,7 +203,7 @@ const SectionManagement = () => {
       await archiveRecord("sections", section, user.id);
     }
     await supabase.from("sections").delete().in("id", selectedSections);
-    Swal.fire("Archived!", `${selectedSections.length} sections have been archived.`, "success");
+    Swal.fire("Removed!", `${selectedSections.length} sections have been removed.`, "success");
     fetchSections();
     setIsSelectionMode(false);
   };
@@ -272,7 +272,7 @@ const SectionManagement = () => {
                 className="select-multiple-btn"
                 onClick={toggleSelectionMode}
               >
-                {isSelectionMode ? 'Cancel' : 'Archive'}
+                {isSelectionMode ? 'Cancel' : 'Remove'}
               </button>
               {isSelectionMode && selectedSections.length > 0 && (
                 <button
@@ -332,7 +332,7 @@ const SectionManagement = () => {
                             <button
                               className="archive-btn"
                               onClick={() => handleArchiveSection(section.id)}
-                              title="Archive Section"
+                              title="Remove Section"
                             >
                               <FaArchive />
                             </button>

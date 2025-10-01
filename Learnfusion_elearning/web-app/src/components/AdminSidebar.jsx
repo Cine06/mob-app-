@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
+import { FaBars, FaTimes } from "react-icons/fa";
 import { supabase } from "../utils/supabaseClient";
 import defaultProfile from "/public/default_profile.png";
 import "../styles/Sidebar.css"; 
@@ -11,6 +12,7 @@ const AdminSidebar = () => {
   const [adminName, setAdminName] = useState("Admin");
   const [profilePic, setProfilePic] = useState(defaultProfile);
   const [isUploading, setIsUploading] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { user, setUser } = useAuth();
 
   useEffect(() => {
@@ -87,68 +89,80 @@ const AdminSidebar = () => {
   const handleLogout = () => {
     localStorage.clear();
     setUser(null);
-    window.location.href = "/";
+    navigate("/", { replace: true });
+  };
+
+  const handleLinkClick = () => {
+    if (window.innerWidth <= 768) {
+      setIsSidebarOpen(false);
+    }
   };
 
   return (
-    <div className="sidebar-container">
-      <div className="sidebar">
-        {/* Profile Section (Top, Just Like Screenshot) */}
-        <div className="admin-profile">
-          <label htmlFor="profile-upload" className="admin-profile-pic-label">
-            <img
-              className={`admin-profile-pic ${isUploading ? "uploading" : ""}`}
-              src={profilePic}
-              alt="Profile"
-              onError={(e) => {
-                e.target.src = defaultProfile;
-              }}
+    <>
+      <button className="sidebar-toggle" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
+        {isSidebarOpen ? <FaTimes /> : <FaBars />}
+      </button>
+      <div className={`sidebar-container ${isSidebarOpen ? "open" : ""}`}>
+        <div className="sidebar">
+          <div className="admin-profile">
+            <label htmlFor="profile-upload" className="admin-profile-pic-label">
+              <img
+                className={`admin-profile-pic ${isUploading ? "uploading" : ""}`}
+                src={profilePic}
+                alt="Profile"
+                onError={(e) => {
+                  e.target.src = defaultProfile;
+                }}
+              />
+            </label>
+            <input
+              type="file"
+              id="profile-upload"
+              accept="image/*"
+              onChange={handleProfileChange}
+              style={{ display: "none" }}
             />
-          </label>
-          <input
-            type="file"
-            id="profile-upload"
-            accept="image/*"
-            onChange={handleProfileChange}
-            style={{ display: "none" }}
-          />
-          <p className="admin-profile-name">{adminName}</p>
-        </div>
+            <p className="admin-profile-name">{adminName}</p>
+          </div>
 
-        {/* Navigation */}
-        <ul className="sidebar-nav">
-          <li>
-            <NavLink
-              to="/admin-dashboard"
-              className={({ isActive }) => (isActive ? "active" : "")}
-            >
-              Account Management
-            </NavLink>
-          </li>
-          <li>
-            <NavLink
-              to="/sectionmanage"
-              className={({ isActive }) => (isActive ? "active" : "")}
-            >
-              Section Management
-            </NavLink>
-          </li>
-          <li>
-            <NavLink
-              to="/admin-handouts"
-              className={({ isActive }) => (isActive ? "active" : "")}
-            >
-              Handouts Management
-            </NavLink>
-          </li>
-          <li>
-            <button className="logout-btn" onClick={handleLogout}>
-              Logout
-            </button>
-          </li>
-        </ul>
+          <ul className="sidebar-nav">
+            <li>
+              <NavLink
+                to="/admin-dashboard"
+                className={({ isActive }) => (isActive ? "active" : "")}
+                onClick={handleLinkClick}
+              >
+                Account Management
+              </NavLink>
+            </li>
+            <li>
+              <NavLink
+                to="/sectionmanage"
+                className={({ isActive }) => (isActive ? "active" : "")}
+                onClick={handleLinkClick}
+              >
+                Section Management
+              </NavLink>
+            </li>
+            <li>
+              <NavLink
+                to="/admin-handouts"
+                className={({ isActive }) => (isActive ? "active" : "")}
+                onClick={handleLinkClick}
+              >
+                Handouts Management
+              </NavLink>
+            </li>
+            <li>
+              <button className="logout-btn" onClick={handleLogout}>
+                Logout
+              </button>
+            </li>
+          </ul>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
