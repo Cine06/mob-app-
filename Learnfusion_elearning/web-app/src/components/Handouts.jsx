@@ -209,44 +209,7 @@ const Handouts = () => {
     return youtubeRegex.test(url);
   };
 
-  const handleFileChange = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      if (file.size > 10 * 1024 * 1024) {
-        Swal.fire({
-          icon: 'warning',
-          title: 'File Too Large',
-          text: 'File size should be less than 10MB.',
-        });
-        return;
-      }
-      setSelectedFile(file);
-    }
-  };
-
-  const uploadFile = async (file) => {
-    if (!file) return null;
-
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
-    const filePath = `handouts/${fileName}`;
-
-    const { data, error } = await supabase.storage
-      .from('handouts')
-      .upload(filePath, file);
-
-    if (error) {
-      console.error('Error uploading file:', error);
-      throw error;
-    }
-
-    const { data: urlData } = supabase.storage
-      .from('handouts')
-      .getPublicUrl(filePath);
-
-    return urlData.publicUrl;
-  };
-
+  
   const handleSearch = () => {
     setSearchTerm(search.trim());
   };
@@ -329,7 +292,6 @@ const Handouts = () => {
           .single();
 
         const sectionName = sectionError ? "Unknown Section" : sectionData.section_name;
-
         const { data: studentAssignments, error: assignmentError } = await supabase
           .from("handouts_list_student_under_tag_section")
           .select("users_id")
@@ -388,7 +350,6 @@ const Handouts = () => {
       });
       return;
     }
-
     if (!tagHandoutId) {
       Swal.fire({
         icon: 'warning',
@@ -763,7 +724,6 @@ const Handouts = () => {
         </div>
       </main>
 
-      {/* Modal for tagging handout to section */}
       {showTagModal && (
         <div className="modal-overlay" onClick={closeTagModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -820,7 +780,6 @@ const Handouts = () => {
         </div>
       )}
 
-      {/* Modal for untagging handout from sections */}
       {showUntagModal && untagHandout && (
         <div className="modal-overlay" onClick={closeUntagModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -878,7 +837,6 @@ const Handouts = () => {
         </div>
       )}
 
-      {/* Modal for viewing student details */}
       {showStudentsModal && (
         <div className="modal-overlay" onClick={closeStudentsModal}>
           <div className="modal-content students-modal" onClick={(e) => e.stopPropagation()}>
@@ -946,3 +904,4 @@ const Handouts = () => {
 };
 
 export default Handouts;
+

@@ -68,7 +68,7 @@ export default StyleSheet.create({
     codeInput: { 
         backgroundColor: "white", 
         padding: 10, borderRadius: 5, 
-        minHeight: 300, fontSize: 14, 
+        minHeight: 450, fontSize: 14, 
         textAlignVertical: "top" 
     },
     outputText: { 
@@ -175,4 +175,5 @@ export default StyleSheet.create({
         backgroundColor: "#e8f5e8",
         borderRadius: 3
     }
+    
   });

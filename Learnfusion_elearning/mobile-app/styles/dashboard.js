@@ -79,14 +79,13 @@ export default StyleSheet.create({
         borderColor: "black",
         borderWidth: 2,
       },
-      notifications: {
-        flexDirection: "row",
-        alignItems: "center",
-        backgroundColor: "#FFF",
+      remindersContainer: {
         padding: 15,
         borderRadius: 10,
         borderColor: "#046a38",
         borderWidth: 1,
+        backgroundColor: "white",
+        marginBottom: 15,
       },
       reminderText: {
         marginLeft: 10,

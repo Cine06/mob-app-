@@ -1,23 +1,49 @@
-import { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert} from "react-native";
+
+import { useState, useRef, useEffect } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  Alert,
+  KeyboardAvoidingView,
+  Platform
+} from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import BottomNav from "../components/BottomNav";
-import { useRouter, Stack } from "expo-router";
+import { Stack } from "expo-router";
 import FloatingChatbot from "../components/FloatingChatbot";
+import { JDOODLE_CLIENT_ID, JDOODLE_CLIENT_SECRET, JDOODLE_RUN_URL } from '@env';
 import styles from "../styles/code";
+
+const DEBUG = true;
 
 export default function CodeSnippets() {
   const [selectedTab, setSelectedTab] = useState("code");
   const [code, setCode] = useState("");
   const [output, setOutput] = useState("Output will be displayed here");
   const [isRunning, setIsRunning] = useState(false);
+  const [stdin, setStdin] = useState("");
   const [completedTopics, setCompletedTopics] = useState(new Set());
-  const [javaVersion, setJavaVersion] = useState(null);
+  const [activeTopic, setActiveTopic] = useState(null);
+  const outputScrollRef = useRef(null);
+  const showInputPanel = code.includes("Scanner");
 
-  const javaTopics = {
+  const log = (msg, data = null) => {
+    if (!DEBUG) return;
+    const timestamp = new Date().toISOString();
+    if (data !== null) {
+      console.log(`[CodeSnippets ${timestamp}] ${msg}`, data);
+    } else {
+      console.log(`[CodeSnippets ${timestamp}] ${msg}`);
+    }
+  };
+
+   const javaTopics = {
     "Java Basics": [
       "Run HelloWorld program",
-      "Hello with name input/output", 
+      "Hello with name input/output",
       "Hello with name and date"
     ],
     "Variables & Data Types": [
@@ -37,7 +63,7 @@ export default function CodeSnippets() {
     ],
     "Arrays & Collections": [
       "Declare, initialize, and use a 1D array",
-      "Declare, initialize, and use a 2D array", 
+      "Declare, initialize, and use a 2D array",
       "Use an ArrayList (add, remove, get elements)"
     ],
     "Object-Oriented Programming": [
@@ -48,24 +74,49 @@ export default function CodeSnippets() {
     ]
   };
 
+
   const codeTemplates = {
     "Run HelloWorld program": `public class HelloWorld {
     public static void main(String[] args) {
         System.out.println("Hello, World!");
     }
 }`,
+
     "Hello with name input/output": `import java.util.Scanner;
 
 public class HelloName {
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
-        System.out.print("Enter your name: ");
-        String name = scanner.nextLine();
-        System.out.println("Hello, " + name + "!");
+        System.out.println("Enter your name: ");
+        
+        if (scanner.hasNextLine()) {
+            String name = scanner.nextLine();
+            System.out.println("Hello, " + name + "!");
+        }
+        
         scanner.close();
     }
 }`,
-    "Declare and initialize primitive variables": `public class Variables {
+
+    "Hello with name and date": `import java.util.Scanner;
+import java.time.LocalDate;
+
+public class HelloNameDate {
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        System.out.println("Enter your name: ");
+
+        if (scanner.hasNextLine()) {
+            String name = scanner.nextLine();
+            LocalDate today = LocalDate.now();
+            System.out.println("Hello, " + name + "! Today is " + today + ".");
+        }
+
+        scanner.close();
+    }
+}`,
+
+    "Declare and initialize primitive variables (int, double, boolean, etc.)": `public class Variables {
     public static void main(String[] args) {
         int age = 25;
         double height = 5.9;
@@ -78,680 +129,474 @@ public class HelloName {
         System.out.println("Grade: " + grade);
     }
 }`,
-    "If-else statements": `public class DecisionMaking {
+
+    "Declare and initialize object references (String, custom objects)": `public class ObjectReferences {
     public static void main(String[] args) {
-        int score = 85;
+        String name = "Francine";
+        Object obj = new Object();
         
-        if (score >= 90) {
-            System.out.println("Grade: A");
-        } else if (score >= 80) {
-            System.out.println("Grade: B");
-        } else if (score >= 70) {
-            System.out.println("Grade: C");
+        System.out.println("Name: " + name);
+        System.out.println("Object: " + obj.toString());
+    }
+}`,
+
+    "Read and write to object fields": `class Person {
+    String name;
+    int age;
+}
+
+public class ObjectFields {
+    public static void main(String[] args) {
+        Person p = new Person();
+        p.name = "Francine";
+        p.age = 20;
+
+        System.out.println("Name: " + p.name);
+        System.out.println("Age: " + p.age);
+    }
+}`,
+
+    "Basic arithmetic, relational, logical operators": `public class Operators {
+    public static void main(String[] args) {
+        int a = 10, b = 5;
+        System.out.println("a + b = " + (a + b));
+        System.out.println("a > b? " + (a > b));
+        System.out.println("Logical AND: " + ((a > 0) && (b > 0)));
+    }
+}`,
+
+    "If-else statements": `public class IfElseExample {
+    public static void main(String[] args) {
+        int num = 10;
+        if(num > 0) {
+            System.out.println("Positive number");
         } else {
-            System.out.println("Grade: F");
+            System.out.println("Non-positive number");
         }
     }
 }`,
-    "Declare, initialize, and use a 1D array": `public class ArrayExample {
+
+    "Switch statement": `public class SwitchExample {
     public static void main(String[] args) {
-        int[] numbers = {1, 2, 3, 4, 5};
-        
-        System.out.println("Array elements:");
-        for (int i = 0; i < numbers.length; i++) {
-            System.out.println("Index " + i + ": " + numbers[i]);
-        }
-        
-        System.out.println("\\nUsing enhanced for loop:");
-        for (int num : numbers) {
-            System.out.println(num);
+        int day = 3;
+        switch(day) {
+            case 1: System.out.println("Monday"); break;
+            case 2: System.out.println("Tuesday"); break;
+            case 3: System.out.println("Wednesday"); break;
+            default: System.out.println("Another day");
         }
     }
 }`,
-    "Object-Oriented Programming Example": `public class Car {
-    String brand;
+
+    "Declare, initialize, and use a 1D array": `public class Array1D {
+    public static void main(String[] args) {
+        int[] nums = {1, 2, 3, 4, 5};
+        for(int n : nums) {
+            System.out.println(n);
+        }
+    }
+}`,
+
+    "Declare, initialize, and use a 2D array": `public class Array2D {
+    public static void main(String[] args) {
+        int[][] matrix = {{1,2},{3,4}};
+        for(int i=0;i<matrix.length;i++){
+            for(int j=0;j<matrix[i].length;j++){
+                System.out.println("matrix[" + i + "][" + j + "] = " + matrix[i][j]);
+            }
+        }
+    }
+}`,
+
+    "Use an ArrayList (add, remove, get elements)": `import java.util.ArrayList;
+
+public class ArrayListExample {
+    public static void main(String[] args) {
+        ArrayList<String> list = new ArrayList<>();
+        list.add("Apple");
+        list.add("Banana");
+        list.add("Cherry");
+        for(String item : list) {
+            System.out.println(item);
+        }
+    }
+}`,
+
+    "Create a class with fields and methods": `class Car {
     String model;
     int year;
 
-    public Car(String brand, String model, int year) {
-        this.brand = brand;
-        this.model = model;
-        this.year = year;
+    void display() {
+        System.out.println(model + " - " + year);
     }
+}
 
-    public void displayCarDetails() {
-        System.out.println("Brand: " + brand);
-        System.out.println("Model: " + model);
-        System.out.println("Year: " + year);
-    }
-
+public class CarExample {
     public static void main(String[] args) {
-        System.out.println("Program started...");
-
-        Car myCar = new Car("Toyota", "Camry", 2023);
-        myCar.displayCarDetails();
-
-        Car anotherCar = new Car("Honda", "Civic", 2024);
-        anotherCar.displayCarDetails();
-
-        System.out.println("Program ended...");
+        Car c = new Car();
+        c.model = "Toyota";
+        c.year = 2022;
+        c.display();
     }
-}`
+}`,
+
+    "Use constructors to initialize objects": `class Book {
+    String title;
+    Book(String t) {
+        title = t;
+    }
+}
+
+public class ConstructorExample {
+    public static void main(String[] args) {
+        Book b = new Book("Java 101");
+        System.out.println("Book title: " + b.title);
+    }
+}`,
+
+    "Object-Oriented Programming Example": `class Animal {
+    void sound() {
+        System.out.println("Some sound");
+    }
+}
+
+class Dog extends Animal {
+    void sound() {
+        System.out.println("Bark");
+    }
+}
+
+public class OOPExample {
+    public static void main(String[] args) {
+        Animal a = new Dog();
+        a.sound(); // Polymorphism
+    }
+}`,
+
+    // --- Existing useful templates ---
+    "Simple addition program": `import java.util.Scanner;
+
+public class AddNumbers {
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        System.out.println("Enter first number: ");
+
+        if (scanner.hasNextInt()) {
+            int a = scanner.nextInt();
+            System.out.println("Enter second number: ");
+            if (scanner.hasNextInt()) {
+                int b = scanner.nextInt();
+                System.out.println("The sum is: " + (a + b));
+            }
+        }
+        scanner.close();
+    }
+}`,
   };
 
-  const runCode = async () => {
-    if (!code.trim()) {
-      Alert.alert("Error", "Please enter some code to run");
-      return;
-    }
+  const executeOnJDoodle = async (javaSource, stdinInput = "") => {
+    log("Preparing JDoodle request", { stdinInput, javaSourceLength: javaSource.length });
 
-    setSelectedTab("output");
-    setIsRunning(true);
-    setOutput("Running code...");
-    
+    const payload = {
+      clientId: JDOODLE_CLIENT_ID,
+      clientSecret: JDOODLE_CLIENT_SECRET,
+      script: javaSource,
+      language: "java",
+      versionIndex: "3",
+      stdin: stdinInput,
+    };
+
     try {
-      const result = simulateJavaExecution(code);
-      setOutput(result.output);
+      const resp = await fetch(JDOODLE_RUN_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!resp.ok) {
+        const txt = await resp.text();
+        log("JDoodle HTTP error", { status: resp.status, response: txt });
+        throw new Error(`JDoodle HTTP ${resp.status}`);
+      }
+
+      const json = await resp.json();
+      log("JDoodle response received", json);
+      return { success: true, output: json.output || "", statusCode: json.statusCode || resp.status };
+    } catch (err) {
+      log("JDoodle execution failed", err);
+      throw err;
+    }
+  };
+
+  const proceedWithRun = async () => {
+    setOutput("Running code...");
+    setIsRunning(true);
+    setSelectedTab("output");
+  
+    try {
+      log("Executing on JDoodle with provided stdin...");
+      const result = await executeOnJDoodle(code, stdin);
+      log("JDoodle result processed", result);
+  
+      const programOutput = result.output?.trim() || "No output received.";
+      let finalOutput = "";
+
+      if (stdin.trim()) {
+        const formattedInput = stdin.trim().split('\n').map(line => `> ${line}`).join('\n');
+        finalOutput += `Your Input:\n${formattedInput}\n\n--- Output ---\n`;
+      }
+      finalOutput += programOutput;
+      setOutput(finalOutput);
       
       if (result.success) {
         checkCodeCompletion();
       }
-      
     } catch (error) {
-      console.error("Code execution error:", error);
-      setOutput("Code execution failed: " + error.message);
+      setOutput("❌ Code execution failed: " + error.message);
+      log("Code run error", error);
     } finally {
+      log("Run complete");
       setIsRunning(false);
     }
+  }
+
+  const runCode = () => {
+    log("Starting new run", { codeLength: code.length, stdinLength: stdin.length });
+
+    if (!code.trim()) {
+      Alert.alert("Error", "Please enter some code to run");
+      log("Run aborted — empty code");
+      return;
+    }
+
+    if (showInputPanel && !stdin.trim()) {
+      Alert.alert(
+        "Input Required",
+        "This code needs input to run. Please provide the required data in the input box below the code editor first.",
+        [{ text: "OK" }]
+      );
+      log("Run aborted - input required but not provided.");
+      return;
+    }
+
+    proceedWithRun();
   };
 
-  const generateClassOutput = (className, params, javaCode) => {
-    let output = "";
-    
-    const classDef = javaCode.match(new RegExp(`class\\s+${className}\\s*\\{[\\s\\S]*?\\}`, 'i'));
-    
-    if (classDef) {
-      const classContent = classDef[0];
-      
-      const fieldMatches = classContent.match(/(\w+)\s+(\w+)\s*;/g);
-      const fields = [];
-      if (fieldMatches) {
-        fieldMatches.forEach(field => {
-          const fieldMatch = field.match(/(\w+)\s+(\w+)\s*;/);
-          if (fieldMatch) {
-            fields.push(fieldMatch[2]); 
-          }
-        });
-      }
-      
-      const methodMatches = classContent.match(/public\s+void\s+(\w+)\s*\([^)]*\)\s*\{[^}]*System\.out\.println[^}]*\}/g);
-      const methods = [];
-      if (methodMatches) {
-        methodMatches.forEach(method => {
-          const methodMatch = method.match(/public\s+void\s+(\w+)\s*\(/);
-          if (methodMatch) {
-            methods.push(methodMatch[1]);
-          }
-        });
-      }
-      
-      if (fields.length > 0 && params.length > 0) {
-        const minLength = Math.min(fields.length, params.length);
-        for (let i = 0; i < minLength; i++) {
-          const fieldName = fields[i];
-          const paramValue = params[i];
-          
-          const displayName = fieldName.charAt(0).toUpperCase() + fieldName.slice(1);
-          output += `${displayName}: ${paramValue}\n`;
-        }
-      } else {
-        params.forEach((param, index) => {
-          output += `Parameter ${index + 1}: ${param}\n`;
-        });
-      }
-    } else {
-      params.forEach((param, index) => {
-        output += `${className} parameter ${index + 1}: ${param}\n`;
-      });
-    }
-    
-    return output;
-  };
+  const hasException = (text) => {
+    const lower = text.toLowerCase();
+    return lower.includes("exception in thread") || lower.includes("error:");
+  }
 
-  const simulateJavaExecution = (javaCode) => {
-    const codeLower = javaCode.toLowerCase();
-    
-    if (!javaCode.includes("public class")) {
-      return {
-        success: false,
-        output: "Compilation Error:\nMissing 'public class' declaration.\nEvery Java program must have a public class."
-      };
-    }
-    
-    if (!javaCode.includes("public static void main")) {
-      return {
-        success: false,
-        output: "Compilation Error:\nMissing 'main' method.\nEvery Java program must have a main method:\npublic static void main(String[] args)"
-      };
-    }
-    
-    let output = "Code executed successfully!\n\n";
-    let hasOutput = false;
-    
-    const printStatements = javaCode.match(/System\.out\.println\s*\(\s*["']([^"']*)["']\s*\)/g);
-    if (printStatements) {
-      hasOutput = true;
-      printStatements.forEach(stmt => {
-        const match = stmt.match(/System\.out\.println\s*\(\s*["']([^"']*)["']\s*\)/);
-        if (match) {
-          output += match[1] + "\n";
-        }
-      });
-    }
-    
-    const printStatements2 = javaCode.match(/System\.out\.print\s*\(\s*["']([^"']*)["']\s*\)/g);
-    if (printStatements2) {
-      hasOutput = true;
-      printStatements2.forEach(stmt => {
-        const match = stmt.match(/System\.out\.print\s*\(\s*["']([^"']*)["']\s*\)/);
-        if (match) {
-          output += match[1];
-        }
-      });
-    }
-    
-    if (codeLower.includes("new ") && codeLower.includes("class")) {
-      hasOutput = true;
-      
-      const objectCreations = javaCode.match(/new\s+(\w+)\s*\([^)]*\)/g);
-      if (objectCreations) {
-        objectCreations.forEach(creation => {
-          const classMatch = creation.match(/new\s+(\w+)\s*\(/);
-          if (classMatch) {
-            const className = classMatch[1];
-            
-            const paramMatch = creation.match(/new\s+\w+\s*\(([^)]*)\)/);
-            if (paramMatch) {
-              const params = paramMatch[1];
-              
-              const paramList = params.split(',').map(p => p.trim());
-              const parsedParams = paramList.map(param => {
-                if (param.match(/^["'][^"']*["']$/)) {
-                  return param.slice(1, -1); 
-                }
-                if (param.match(/^\d+$/)) {
-                  return param;
-                }
-                return param;
-              });
-              
-              output += generateClassOutput(className, parsedParams, javaCode);
-            }
-          }
-        });
-      }
-    }
-    
-    const methodCalls = javaCode.match(/\w+\.\w+\s*\([^)]*\)/g);
-    if (methodCalls && methodCalls.length > 0) {
-      hasOutput = true;
-    }
-    
-    if (codeLower.includes("system.out.println") && codeLower.includes("+") && 
-        (codeLower.includes("name") || codeLower.includes("age") || codeLower.includes("hello"))) {
-      hasOutput = true;
-      if (codeLower.includes("hello") && codeLower.includes("name")) {
-        output += "Hello, [User Name]!\n";
-      }
-      if (codeLower.includes("java.version")) {
-        output += "Java version: 11.0.2\n";
-      }
-    }
-    
-    if ((codeLower.includes("int[]") || codeLower.includes("string[]")) && 
-        (codeLower.includes("for") || codeLower.includes("length") || codeLower.includes("index"))) {
-      hasOutput = true;
-      
-      const arrayMatches = javaCode.match(/(?:int\[\]|String\[\])\s+(\w+)\s*=\s*\{([^}]+)\}/g);
-      if (arrayMatches) {
-        arrayMatches.forEach(arrayMatch => {
-          const arrayDefMatch = arrayMatch.match(/(?:int\[\]|String\[\])\s+(\w+)\s*=\s*\{([^}]+)\}/);
-          if (arrayDefMatch) {
-            const arrayName = arrayDefMatch[1];
-            const valuesString = arrayDefMatch[2];
-            const values = valuesString.split(',').map(v => v.trim().replace(/['"]/g, ''));
-            
-            const loopWithArray = javaCode.match(new RegExp(`for\\s*\\([^)]*${arrayName}\\.length[^)]*\\)`, 'g'));
-            if (loopWithArray) {
-              const printInLoop = javaCode.match(new RegExp(`System\\.out\\.println\\s*\\([^)]*\\+\\s*${arrayName}\\[[^\\]]+\\][^)]*\\)`, 'g'));
-              if (printInLoop) {
-                const printMatch = printInLoop[0].match(/System\.out\.println\s*\(\s*["']([^"']*)["']\s*\+/);
-                if (printMatch) {
-                  const prefix = printMatch[1];
-                  values.forEach((value, index) => {
-                    output += `${prefix}${index}: ${value}\n`;
-                  });
-                } else {
-                  values.forEach((value, index) => {
-                    output += `Index ${index}: ${value}\n`;
-                  });
-                }
-              } else {
-                values.forEach((value, index) => {
-                  output += `Index ${index}: ${value}\n`;
-                });
-              }
-            } else {
-              output += "Array elements:\n";
-              values.forEach((value, index) => {
-                output += `Index ${index}: ${value}\n`;
-              });
-            }
-          }
-        });
-      } else {
-        const arrayDeclarations = javaCode.match(/(?:int\[\]|String\[\])\s+(\w+)\s*;/g);
-        if (arrayDeclarations) {
-          arrayDeclarations.forEach(declaration => {
-            const declMatch = declaration.match(/(?:int\[\]|String\[\])\s+(\w+)\s*;/);
-            if (declMatch) {
-              const arrayName = declMatch[1];
-              
-              const loopWithArray = javaCode.match(new RegExp(`for\\s*\\([^)]*${arrayName}\\.length[^)]*\\)`, 'g'));
-              if (loopWithArray) {
-                const loopMatch = loopWithArray[0].match(/for\s*\(\s*[^;]+;\s*([^;]+);\s*[^)]+\)/);
-                if (loopMatch) {
-                  const condition = loopMatch[1];
-                  if (condition.includes('<') && condition.includes('5')) {
-                    output += "Index 0: [value]\n";
-                    output += "Index 1: [value]\n";
-                    output += "Index 2: [value]\n";
-                    output += "Index 3: [value]\n";
-                    output += "Index 4: [value]\n";
-                  } else {
-                    output += "Index 0: [value]\n";
-                    output += "Index 1: [value]\n";
-                    output += "Index 2: [value]\n";
-                  }
-                }
-              }
-            }
-          });
-        }
-      }
-    }
-    
-    if ((codeLower.includes("for") || codeLower.includes("while")) && 
-        codeLower.includes("system.out.println")) {
-      hasOutput = true;
-      
-      const forLoops = javaCode.match(/for\s*\(\s*([^;]+);\s*([^;]+);\s*([^)]+)\)/g);
-      if (forLoops) {
-        forLoops.forEach(loop => {
-          const loopMatch = loop.match(/for\s*\(\s*([^;]+);\s*([^;]+);\s*([^)]+)\)/);
-          if (loopMatch) {
-            const init = loopMatch[1].trim();
-            const condition = loopMatch[2].trim();
-            const increment = loopMatch[3].trim();
-            
-            const varMatch = init.match(/(\w+)\s*=\s*(\d+)/);
-            if (varMatch) {
-              const varName = varMatch[1];
-              const startValue = parseInt(varMatch[2]);
-              
-              let endValue = startValue + 3; 
-              if (condition.includes('<')) {
-                const endMatch = condition.match(/<\s*(\d+)/);
-                if (endMatch) {
-                  endValue = parseInt(endMatch[1]);
-                } else if (condition.includes('length')) {
-                  const arrayMatches = javaCode.match(/(?:int\[\]|String\[\])\s+\w+\s*=\s*\{([^}]+)\}/g);
-                  if (arrayMatches) {
-                    const valuesMatch = arrayMatches[0].match(/\{([^}]+)\}/);
-                    if (valuesMatch) {
-                      const values = valuesMatch[1].split(',').map(v => v.trim());
-                      endValue = values.length;
-                    }
-                  }
-                }
-              }
-              
-              for (let i = startValue; i < endValue; i++) {
-                const printInLoop = javaCode.match(new RegExp(`System\\.out\\.println\\s*\\([^)]*\\+\\s*${varName}[^)]*\\)`, 'g'));
-                if (printInLoop) {
-                  const printMatch = printInLoop[0].match(/System\.out\.println\s*\(\s*["']([^"']*)["']\s*\+/);
-                  if (printMatch) {
-                    output += `${printMatch[1]}${i}\n`;
-                  } else {
-                    output += `Loop iteration: ${i}\n`;
-                  }
-                } else {
-                  output += `Loop iteration: ${i}\n`;
-                }
-              }
-            }
-          }
-        });
-      }
-      
-      const whileLoops = javaCode.match(/while\s*\(([^)]+)\)/g);
-      if (whileLoops) {
-        whileLoops.forEach(loop => {
-          const conditionMatch = loop.match(/while\s*\(([^)]+)\)/);
-          if (conditionMatch) {
-            const condition = conditionMatch[1];
-            
-            if (condition.includes('<') && condition.includes('5')) {
-              output += "While loop iteration: 0\n";
-              output += "While loop iteration: 1\n";
-              output += "While loop iteration: 2\n";
-              output += "While loop iteration: 3\n";
-              output += "While loop iteration: 4\n";
-            } else {
-              output += "While loop iteration: 1\n";
-              output += "While loop iteration: 2\n";
-              output += "While loop iteration: 3\n";
-            }
-          }
-        });
-      }
-    }
-    
-    if (codeLower.includes("if") && codeLower.includes("system.out.println")) {
-      hasOutput = true;
-      
-      const ifStatements = javaCode.match(/if\s*\([^)]+\)\s*\{[^}]*System\.out\.println[^}]*\}/g);
-      if (ifStatements) {
-        ifStatements.forEach(ifStmt => {
-          const conditionMatch = ifStmt.match(/if\s*\(([^)]+)\)/);
-          if (conditionMatch) {
-            const condition = conditionMatch[1];
-            
-            const printMatch = ifStmt.match(/System\.out\.println\s*\(\s*["']([^"']*)["']\s*\)/);
-            if (printMatch) {
-              const printText = printMatch[1];
-              
-              if (condition.includes('>=') && condition.includes('90')) {
-                output += "Grade: A\n";
-              } else if (condition.includes('>=') && condition.includes('80')) {
-                output += "Grade: B\n";
-              } else if (condition.includes('>=') && condition.includes('70')) {
-                output += "Grade: C\n";
-              } else {
-                output += `${printText}\n`;
-              }
-            }
-          }
-        });
-      } else {
-        if (codeLower.includes("grade") || codeLower.includes("score")) {
-          output += "Grade: B\n";
-        }
-      }
-    }
-    
-    if (codeLower.includes("program started") || codeLower.includes("program ended")) {
-      hasOutput = true;
-      if (codeLower.includes("program started")) {
-        output = "Program started...\n" + output;
-      }
-      if (codeLower.includes("program ended")) {
-        output += "Program ended...\n";
-      }
-    }
-    
-    if (!hasOutput) {
-      output += "Program executed successfully but produced no output.\n";
-      output += "Try adding System.out.println() statements to see output.";
-    }
-    
-    output += "\nYour code demonstrates: " + analyzeCode();
-    
-    return {
-      success: true,
-      output: output
-    };
-  };
-
-  const analyzeCode = () => {
-    const codeLower = code.toLowerCase();
-    const features = [];
-    
-    if (codeLower.includes("system.out.println")) features.push("Output statements");
-    if (codeLower.includes("scanner")) features.push("Input handling");
-    if (codeLower.includes("if") && codeLower.includes("else")) features.push("Conditional logic");
-    if (codeLower.includes("for") || codeLower.includes("while")) features.push("Loops");
-    if (codeLower.includes("int[]") || codeLower.includes("string[]")) features.push("Arrays");
-    if (codeLower.includes("class")) features.push("Class definition");
-    if (codeLower.includes("public static void main")) features.push("Main method");
-    
-    return features.length > 0 ? features.join(", ") : "Basic Java structure";
-  };
-
-
-  const checkCodeCompletion = () => {
-    const codeLower = code.toLowerCase();
-    const newCompleted = new Set(completedTopics);
-
-    if (codeLower.includes("system.out.println") && codeLower.includes("hello")) {
-      newCompleted.add("Run HelloWorld program");
-    }
-    if (codeLower.includes("scanner") && codeLower.includes("nextline")) {
-      newCompleted.add("Hello with name input/output");
-    }
-
-    if (codeLower.includes("int ") && codeLower.includes("double ") && codeLower.includes("boolean ")) {
-      newCompleted.add("Declare and initialize primitive variables (int, double, boolean, etc.)");
-    }
-    if (codeLower.includes("string ") && codeLower.includes("new ")) {
-      newCompleted.add("Declare and initialize object references (String, custom objects)");
-    }
-    if (codeLower.includes("stringbuilder")) {
-      newCompleted.add("String and StringBuilder manipulation");
-    }
-
-    if (codeLower.includes("if") && codeLower.includes("else")) {
-      newCompleted.add("If-else statements");
-    }
-    if (codeLower.includes("switch")) {
-      newCompleted.add("Switch statement");
-    }
-    if (codeLower.includes("==") || codeLower.includes(".equals")) {
-      newCompleted.add("Test equality (== vs. .equals())");
-    }
-
-    if (codeLower.includes("int[]") || codeLower.includes("string[]")) {
-      newCompleted.add("Declare, initialize, and use a 1D array");
-    }
-    if (codeLower.includes("int[][]") || codeLower.includes("string[][]")) {
-      newCompleted.add("Declare, initialize, and use a 2D array");
-    }
-    if (codeLower.includes("arraylist")) {
-      newCompleted.add("Use an ArrayList (add, remove, get elements)");
-    }
-
-    if (codeLower.includes("class") && codeLower.includes("public") && codeLower.includes("{")) {
-      newCompleted.add("Create a class with fields and methods");
-    }
-    
-    const constructorPattern = /public\s+\w+\s*\([^)]*\)\s*\{/g;
-    if (constructorPattern.test(code)) {
-      newCompleted.add("Use constructors to initialize objects");
-    }
-    
-    if (codeLower.includes("new ") && codeLower.includes("(") && codeLower.includes(")")) {
-      newCompleted.add("Call methods on objects");
-    }
-    
-    if (codeLower.includes("class") && codeLower.includes("new ") && 
-        code.match(/\w+\.\w+\s*\([^)]*\)/)) {
-      newCompleted.add("Object-Oriented Programming Example");
-    }
-
-    setCompletedTopics(newCompleted);
-  };
-
+  const checkCodeCompletion = (topicToCheck = activeTopic) => {
+     if (!topicToCheck) return;
+ 
+     const codeLower = code.toLowerCase();
+     const newCompleted = new Set(completedTopics);
+     const checkAndAdd = (topic, keywords) => {
+       if (keywords.every(kw => codeLower.includes(kw))) {
+         if (!newCompleted.has(topic)) {
+           newCompleted.add(topic);
+           log(`Checklist: "${topic}" marked complete`);
+         }
+       }
+     };
+ 
+     const topicChecks = {
+       "Run HelloWorld program": ["class helloworld", "hello, world!"],
+       "Hello with name input/output": ["class helloname", "scanner", "nextline"],
+       "Hello with name and date": ["class hellonamedate", "localdate"],
+       "Declare and initialize primitive variables (int, double, boolean, etc.)": ["class variables", "int age", "double height"],
+       "Declare and initialize object references (String, custom objects)": ["class objectreferences", "string name", "object obj"],
+       "Read and write to object fields": ["class person", "p.name", "p.age"],
+       "Basic arithmetic, relational, logical operators": ["class operators", "a + b", "a > b"],
+       "If-else statements": ["class ifelseexample", "if(num > 0)"],
+       "Switch statement": ["class switchexample", "switch(day)"],
+       "Declare, initialize, and use a 1D array": ["class array1d", "int[] nums"],
+       "Declare, initialize, and use a 2D array": ["class array2d", "int[][] matrix"],
+       "Use an ArrayList (add, remove, get elements)": ["class arraylistexample", "arraylist<string>"],
+       "Create a class with fields and methods": ["class car", "void display()"],
+       "Use constructors to initialize objects": ["class book", "book(string t)"],
+       "Object-Oriented Programming Example": ["class animal", "class dog extends animal", "a.sound()"],
+       "Simple addition program": ["class addnumbers", "enter first number"],
+     };
+ 
+     if (topicChecks[topicToCheck]) {
+       checkAndAdd(topicToCheck, topicChecks[topicToCheck]);
+     }
+ 
+     if (newCompleted.size > completedTopics.size) {
+       setCompletedTopics(newCompleted);
+     }
+   };
   const loadTemplate = (topic) => {
     if (codeTemplates[topic]) {
-      Alert.alert(
-        "Load Template",
-        `Do you want to load the template for "${topic}"?\n\nThis will replace your current code.`,
-        [
-          { text: "Cancel", style: "cancel" },
-          { 
-            text: "Load Template", 
-            onPress: () => {
-              setCode(codeTemplates[topic]);
-              setSelectedTab("code");
-            }
-          }
-        ]
-      );
+      Alert.alert("Load Template", `Load template for "${topic}"?`, [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Load Template",
+          onPress: () => {
+            setCode(codeTemplates[topic]);
+            setActiveTopic(topic);
+            setSelectedTab("code");
+            setStdin("");
+            setOutput("Output will be displayed here");
+          },
+        },
+      ]);
+    } else {
+      Alert.alert("No Template", `A code template for "${topic}" is not yet available.`);
     }
   };
 
   const clearCode = () => {
-    Alert.alert(
-      "Clear Code",
-      "Are you sure you want to clear the code editor?",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Clear", onPress: () => setCode("") }
-      ]
-    );
+    Alert.alert("Clear Code", "Clear the code editor?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Clear",
+        onPress: () => {
+          setCode("");
+          setActiveTopic(null);
+          setStdin("");
+          setOutput("Output will be displayed here");
+        },
+      },
+    ]);
   };
 
   const testConnection = async () => {
     setIsRunning(true);
-    setOutput("Testing code execution capabilities...");
-    
+    setOutput("Testing JDoodle connection...");
+    setSelectedTab("output");
+    log("Testing JDoodle connection...");
+
     try {
-      const testCode = `public class Test {
-    public static void main(String[] args) {
-        System.out.println("Connection test successful!");
-        System.out.println("Java version: " + System.getProperty("java.version"));
-    }
-}`;
-      
-      setOutput("✅ Code execution system ready!\n\n" +
-                "Simulated output:\n" +
-                "Connection test successful!\n" +
-                "Java version: 11.0.2\n\n" +
-                "Note: Using local code analysis and simulation.\n" +
-                "Your code will be analyzed for Java concepts and syntax.");
-      
-      setJavaVersion("11");
-      
+      const testCode = `public class Test { public static void main(String[] args) { System.out.println("Connection test successful!"); } }`;
+      const res = await executeOnJDoodle(testCode);
+      setOutput("✅ " + (res.output || "") + "\nConnected to JDoodle.");
+      log("Connection test passed", res);
     } catch (error) {
-      console.error("Connection test error:", error);
-      setOutput("Connection test failed: " + error.message);
+      setOutput("❌ Connection failed: " + error.message);
+      log("Connection test failed", error);
     } finally {
       setIsRunning(false);
     }
   };
-  
+
+
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <FontAwesome5 style={styles.icon} name="code" size={24} color="white" />
-          <Text style={styles.headerText}>JAVA IDE & CHECKLIST</Text>
-        </View>
-        
-        <View style={styles.fileNameContainer}>
-          <TouchableOpacity style={styles.addButton} onPress={clearCode}>
-            <FontAwesome5 name="trash" size={16} color="white" />
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.runButton, { marginLeft: 5, paddingHorizontal: 15 }]} onPress={runCode} disabled={isRunning}>
-            <Text style={styles.runButtonText}>{isRunning ? "RUNNING..." : "RUN"}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.testButton, { marginLeft: 5 }]} onPress={testConnection} disabled={isRunning}>
-            <FontAwesome5 name="wifi" size={12} color="white" />
-          </TouchableOpacity>
-          
-        </View>
-        
-        <View style={styles.tabContainer}>
-          <TouchableOpacity style={[styles.tab, selectedTab === "code" && styles.activeTab]} onPress={() => setSelectedTab("code")}>
-            <Text style={styles.tabText}>CODE</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.tab, selectedTab === "output" && styles.activeTab]} onPress={() => setSelectedTab("output")}>
-            <Text style={styles.tabText}>OUTPUT</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.tab, selectedTab === "checklist" && styles.activeTab]} onPress={() => setSelectedTab("checklist")}>
-            <Text style={styles.tabText}>CHECKLIST</Text>
-          </TouchableOpacity>
-        </View>
-        
-        <ScrollView style={styles.contentContainer}>
-          {selectedTab === "code" ? (
-            <TextInput
-              style={styles.codeInput}
-              multiline
-              value={code}
-              onChangeText={setCode}
-              placeholder="Write your Java code here... Be creative!
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+      >
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <FontAwesome5 style={styles.icon} name="code" size={24} color="white" />
+            <Text style={styles.headerText}>JAVA IDE & CHECKLIST</Text>
+          </View>
 
-Example:
-public class MyProgram {
-    public static void main(String[] args) {
-        System.out.println('Hello, World!');
-    }
-}"
-              placeholderTextColor="#888"
-            />
-          ) : selectedTab === "output" ? (
-            <View style={styles.outputContainer}>
-              <Text style={styles.outputText}>{output}</Text>
-            </View>
-          ) : (
-            <View style={[styles.checklistContainer, {flexGrow: 1, marginBottom: 100}]}>
-              <Text style={styles.checklistTitle}>Java Programming Concepts</Text>
-              <Text style={styles.progressText}>
-                Progress: {completedTopics.size} / {Object.values(javaTopics).flat().length} completed
-              </Text>
-              
-              {Object.entries(javaTopics).map(([category, topics]) => (
-                <View key={category} style={styles.categoryContainer}>
-                  <Text style={styles.categoryTitle}>{category}</Text>
-                  {topics.map((topic, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      style={styles.topicItem}
-                      onPress={() => loadTemplate(topic)}
-                    >
-                      <View style={styles.topicContent}>
-                        <View style={[
-                          styles.checkbox,
-                          completedTopics.has(topic) && styles.checkboxCompleted
-                        ]}>
-                          {completedTopics.has(topic) && (
-                            <FontAwesome5 name="check" size={12} color="white" />
-                          )}
-                        </View>
-                        <Text style={[
-                          styles.topicText,
-                          completedTopics.has(topic) && styles.topicTextCompleted
-                        ]}>
-                          {topic}
-                        </Text>
-                      </View>
-                      <TouchableOpacity 
-                        style={styles.templateButton}
-                        onPress={() => loadTemplate(topic)}
-                      >
-                        <FontAwesome5 name="code" size={12} color="#046a38" />
-                      </TouchableOpacity>
-                    </TouchableOpacity>
+          <View style={styles.fileNameContainer}>
+            <TouchableOpacity style={styles.addButton} onPress={clearCode}>
+              <FontAwesome5 name="trash" size={16} color="white" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.runButton, { marginLeft: 5, paddingHorizontal: 15 }]}
+              onPress={() => runCode()}
+              disabled={isRunning}
+            >
+              <Text style={styles.runButtonText}>{isRunning ? "RUNNING..." : "RUN"}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.testButton, { marginLeft: 5 }]}
+              onPress={testConnection}
+              disabled={isRunning}
+            >
+              <FontAwesome5 name="wifi" size={12} color="white" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.tabContainer}>
+            {["code", "output", "checklist"].map((tab) => (
+              <TouchableOpacity
+                key={tab}
+                style={[styles.tab, selectedTab === tab && styles.activeTab]}
+                onPress={() => setSelectedTab(tab)}
+              >
+                <Text style={styles.tabText}>{tab.toUpperCase()}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <View style={styles.contentContainer}> 
+            {selectedTab === "code" && ( 
+              <View style={{ flex: 1 }}>
+                <ScrollView style={{ flex: 1 }} nestedScrollEnabled={true}>
+                  <TextInput
+                    style={styles.codeInput}
+                    multiline
+                    value={code}
+                    onChangeText={setCode}
+                    placeholder="Write your Java code here..."
+                    placeholderTextColor="#888"
+                    scrollEnabled={false}
+                  />
+                </ScrollView>
+                {showInputPanel && (
+                  <ScrollView style={{ flex: 0.2, borderTopWidth: 1, borderColor: '#333' , marginTop: 10}} nestedScrollEnabled={true}>
+                    <TextInput
+                      style={[styles.codeInput, { height: 'auto', minHeight: 100, fontSize: 14 }]}
+                      multiline
+                      value={stdin}
+                      onChangeText={setStdin}
+                      placeholder="Enter all program input here, one line at a time..."
+                      placeholderTextColor="#888"
+                      scrollEnabled={false}
+                    />
+                  </ScrollView>
+                )}
+              </View>
+            )}
+
+            {selectedTab === "output" && (
+              <View style={styles.outputContainer}>
+                <ScrollView style={{ flex: 1 }} ref={outputScrollRef}>
+                  <Text selectable style={styles.outputText}>
+                    {output}
+                  </Text>
+                </ScrollView>
+              </View>
+            )}
+
+            {selectedTab === "checklist" && ( 
+              <ScrollView>
+                <View style={[styles.checklistContainer, { marginBottom: 100 }]}>
+                  <Text style={styles.checklistTitle}>Java Programming Concepts</Text>
+                  <Text style={styles.progressText}>
+                    Progress: {completedTopics.size} / {Object.values(javaTopics).flat().length} completed
+                  </Text>
+                  {Object.entries(javaTopics).map(([category, topics]) => (
+                    <View key={category} style={styles.categoryContainer}>
+                      <Text style={styles.categoryTitle}>{category}</Text>
+                      {topics.map((topic, index) => (
+                        <TouchableOpacity key={index} style={styles.topicItem} onPress={() => loadTemplate(topic)}>
+                          <View style={styles.topicContent}>
+                            <View style={[styles.checkbox, completedTopics.has(topic) && styles.checkboxCompleted]}><FontAwesome5 name="check" size={12} color={completedTopics.has(topic) ? "white" : "transparent"} /></View>
+                            <Text style={[styles.topicText, completedTopics.has(topic) && styles.topicTextCompleted]}>{topic}</Text>
+                          </View>
+                          <FontAwesome5 name="code" size={12} color="#046a38" style={{ padding: 5 }} />
+                        </TouchableOpacity>
+                      ))}
+                    </View>
                   ))}
                 </View>
-              ))}
-            </View>
-          )}
-        </ScrollView>
-      </View>
-
+              </ScrollView>
+            )}
+          </View> 
+        </View>
+        
+      </KeyboardAvoidingView>
       <FloatingChatbot />
       <BottomNav />
     </>

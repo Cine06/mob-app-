@@ -7,8 +7,7 @@ import * as Speech from 'expo-speech';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
-
-const BACKEND = "http://192.168.0.50:4000";
+import { API_URL } from '@env';
 
 export default function DocumentModal({ visible, document, onClose }) {
   const [loading, setLoading] = useState(false);
@@ -49,7 +48,7 @@ export default function DocumentModal({ visible, document, onClose }) {
     }
 
     try {
-      const resp = await fetch(`${BACKEND}/extract`, {
+      const resp = await fetch(`${API_URL}/extract`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: doc.url }),

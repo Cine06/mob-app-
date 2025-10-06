@@ -317,31 +317,33 @@ export default function Dashboard() {
 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Reminders</Text>
-              <View style={styles.reminders} >
+              <View style={styles.remindersContainer} >
                 {loadingReminders ? (
                   <ActivityIndicator color="#046a38" />
                 ) : reminders.length > 0 ? (
-                  <ScrollView nestedScrollEnabled={true} style={{ maxHeight: 150 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
-                      <FontAwesome5 name="bell" size={20} color="#046a38" />
-                      <Text style={styles.reminderText}>Upcoming Deadlines & Activities</Text>
-                    </View>
-                    {reminders.map((item) => (
-                      <TouchableOpacity 
-                        key={item.id} 
-                        style={[
-                          styles.reminderItem, 
-                          { backgroundColor: '#F0FDF4', borderRadius: 8, padding: 12, marginBottom: 8 }
-                        ]} 
-                        onPress={() => handleReminderPress(item)}
-                      >
-                        <View style={[styles.reminderContent, { flexDirection: 'row', alignItems: 'center' }]}>
-                          <FontAwesome5 name={item.item_type === 'Handout' ? 'file-alt' : 'clipboard-list'} size={16} color="#046a38" style={{ marginRight: 10 }} />
-                          <Text style={styles.reminderTitle} numberOfLines={2}>{renderReminderText(item)}</Text>
-                        </View>
-                      </TouchableOpacity>
-                    ))}
-                    </ScrollView>
+                  <>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                        <FontAwesome5 name="bell" size={20} color="#046a38" />
+                        <Text style={styles.reminderText}>Upcoming Deadlines & Activities</Text>
+                      </View>
+                    <ScrollView nestedScrollEnabled={true} style={{ maxHeight: 150 }}>
+                      {reminders.map((item) => (
+                        <TouchableOpacity 
+                          key={item.id} 
+                          style={[
+                            styles.reminderItem, 
+                            { backgroundColor: '#F0FDF4', borderRadius: 8, padding: 12, marginBottom: 8 }
+                          ]} 
+                          onPress={() => handleReminderPress(item)}
+                        >
+                          <View style={[styles.reminderContent, { flexDirection: 'row', alignItems: 'center' }]}>
+                            <FontAwesome5 name={item.item_type === 'Handout' ? 'file-alt' : 'clipboard-list'} size={16} color="#046a38" style={{ marginRight: 10 }} />
+                            <Text style={styles.reminderTitle} numberOfLines={2}>{renderReminderText(item)}</Text>
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                      </ScrollView>
+                  </>
                 ) : (
                   <View style={[styles.reminderItem,{ flexDirection: 'row', alignItems: 'center' }]}>
                     <FontAwesome5 name="bell-slash" size={16} color="#aaa" />
