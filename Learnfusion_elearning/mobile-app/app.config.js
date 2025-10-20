@@ -55,12 +55,8 @@ export default ({ config }) => ({
     typedRoutes: true,
   },
 
-  // ✅ FIXED: Bare workflow requires a static runtime version
+  // Bare workflow requires a static runtime version for EAS Update.
   runtimeVersion: "1.0.0",
-  // Use SDK version for Expo Go compatibility
-  runtimeVersion: {
-    policy: "sdkVersion",
-  },
 
   updates: {
     // This tells Expo where to get your OTA updates
