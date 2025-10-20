@@ -1,4 +1,4 @@
-import { StyleSheet } from "react-native";
+import { StyleSheet, Platform } from "react-native";
 
 export default StyleSheet.create({
   container: { 
@@ -31,10 +31,10 @@ export default StyleSheet.create({
      height: 40, 
      borderRadius: 20
      },
-  chatContainer: { 
-    flex: 1, 
-    padding: 10 
-},
+  chatContainer: {
+    paddingHorizontal: 10,
+    paddingTop: 10,
+  },
   senderBubble: { 
     alignSelf: "flex-start", 
     backgroundColor: "#E5E5E5", 
@@ -64,14 +64,17 @@ export default StyleSheet.create({
     color: "gray", 
     textAlign: "right" 
 },
+  inputArea: {
+    backgroundColor: 'white',
+  },
   inputContainer: { 
     flexDirection: "row", 
     alignItems: "center", 
     padding: 10, 
     backgroundColor: "white", 
     borderTopWidth: 1, 
-    borderColor: "#ccc", 
-    marginBottom: 30 
+    borderTopColor: "#eee",
+    paddingBottom: Platform.OS === 'ios' ? 20 : 10,
 },
   input: { 
     flex: 1, 
@@ -80,14 +83,14 @@ export default StyleSheet.create({
     borderWidth: 1, 
     borderRadius: 20, 
     paddingHorizontal: 10, 
-    marginRight: 20 , 
-    left: 25
+    marginHorizontal: 10,
 },
   sendButton: { 
     backgroundColor: "#046a38", 
     padding: 10, 
     borderRadius: 20 ,
-     marginLeft: 20
+    justifyContent: 'center',
+    alignItems: 'center',
     },
   dropdownMenu: {
     position: "absolute",
@@ -118,6 +121,22 @@ readReceipt: {
   alignSelf: 'flex-end',
   marginTop: 2,
   marginRight: 5,
-},
-
+  },
+  dateSeparatorContainer: {
+    alignItems: 'center',
+    marginVertical: 10,
+  },
+  dateSeparatorText: {
+    backgroundColor: '#f1f1f1',
+    color: '#666',
+    fontSize: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  fileText: {
+    fontSize: 14,
+    flexShrink: 1,
+  },
 });

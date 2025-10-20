@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, ScrollView, Image, Linking, Modal, Animated } from "react-native";
+import { View, Text, TouchableOpacity, ScrollView, Image, Linking, Modal, Animated, KeyboardAvoidingView, Platform } from "react-native";
 import { useState, useEffect, useRef } from "react";
 import { useRouter, Stack, useLocalSearchParams } from "expo-router";
 import BottomNav from "../components/BottomNav";
@@ -6,8 +6,8 @@ import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { supabase } from "../utils/supabaseClient";
 import styles from "../styles/modules";
 import DocumentModal from "../components/DocumentModal";
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import AwesomeAlert from 'react-native-awesome-alerts';
+import * as SecureStore from "expo-secure-store";
 import { WebView } from "react-native-webview";;
 
 export default function ELearningModules() {
@@ -108,10 +108,11 @@ export default function ELearningModules() {
 
   const updateLessonProgress = async (pageNumber) => {
     try {
-      const user = JSON.parse(await AsyncStorage.getItem("user"));
-      if (user) {
+      const userJson = await SecureStore.getItemAsync("user");
+      if (userJson) {
+        const user = JSON.parse(userJson);
         const progressKey = `lesson_progress_${user.id}`;
-        const currentProgress = await AsyncStorage.getItem(progressKey);
+        const currentProgress = await SecureStore.getItemAsync(progressKey);
         const progress = currentProgress ? JSON.parse(currentProgress) : {};
 
         progress[currentLessonPage] = {
@@ -119,7 +120,7 @@ export default function ELearningModules() {
           completedAt: new Date().toISOString()
         };
 
-        await AsyncStorage.setItem(progressKey, JSON.stringify(progress));
+        await SecureStore.setItemAsync(progressKey, JSON.stringify(progress));
         setLessonProgress(progress);
       }
     } catch (error) {
@@ -131,10 +132,11 @@ export default function ELearningModules() {
   useEffect(() => {
     const loadLessonProgress = async () => {
       try {
-        const user = JSON.parse(await AsyncStorage.getItem("user"));
-        if (user) {
+        const userJson = await SecureStore.getItemAsync("user");
+        if (userJson) {
+          const user = JSON.parse(userJson);
           const progressKey = `lesson_progress_${user.id}`;
-          const progress = await AsyncStorage.getItem(progressKey);
+          const progress = await SecureStore.getItemAsync(progressKey);
           if (progress) {
             setLessonProgress(JSON.parse(progress));
           }
@@ -156,7 +158,8 @@ export default function ELearningModules() {
 
   const getCurrentPageData = async () => {
   const handout = lessonHandouts[currentLessonPage - 1];
-  const user = JSON.parse(await AsyncStorage.getItem("user"));
+  const userJson = await SecureStore.getItemAsync("user");
+  const user = userJson ? JSON.parse(userJson) : null;
 
   if (!handout || !user) {
     return {
@@ -251,9 +254,10 @@ export default function ELearningModules() {
   useEffect(() => {
     const fetchQuizzes = async () => {
        try {
-        const user = JSON.parse(await AsyncStorage.getItem("user"));
+        const userJson = await SecureStore.getItemAsync("user");
 
-        if (user) {
+        if (userJson) {
+          const user = JSON.parse(userJson);
           const { data: userData, error: userError } = await supabase
             .from("users")
             .select("section_id")
@@ -491,15 +495,14 @@ export default function ELearningModules() {
               <Icon name="trophy" size={30} color={activeTab === "quizzes" ? "#046a38" : "white"} />
             </TouchableOpacity>
 
-            <TouchableOpacity style={[styles.sideTabItem, activeTab === "handouts" && styles.activeTab]}
-              onPress={() => setActiveTab("handouts")}>
-              <Icon name="file-document" size={30} color={activeTab === "handouts" ? "#046a38" : "white"} />
-            </TouchableOpacity>
-
           </View>
 
-          <View style={{ flex: 1, backgroundColor: 'white' }}>
-            <ScrollView style={[styles.mainContent, { flexGrow: 1 }]}>
+          <KeyboardAvoidingView 
+            style={{ flex: 1, backgroundColor: 'white' }}
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
+          >
+            <ScrollView style={[styles.mainContent, { flexGrow: 1 }]} contentContainerStyle={{ paddingBottom: 80 }} keyboardShouldPersistTaps="handled">
               {activeTab === "lessons" && (
                 <>
                 <Text style={styles.title}>LESSONS</Text>
@@ -563,56 +566,56 @@ export default function ELearningModules() {
                         case "youtube-video":
                         return (
                           <View key={index} style={styles.contentCard}>
-                          <View style={styles.contentCardHeader}>
-                            <Icon name="youtube" size={24} color="#FF0000" />
-                            <Text style={styles.contentCardTitle}>{item.title}</Text>
-                          </View>
-                          <Text style={styles.contentCardDescription}>{item.description}</Text>
-                          <View style={styles.mediaContainer}>
-                            <WebView
-                            style={{ flex: 1 }}
-                            source={{
-                              html: `
-                              <!DOCTYPE html>
-                              <html>
-                              <head>
-                                <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-                                <style>
-                                  * { margin: 0; padding: 0; box-sizing: border-box; }
-                                  body { background: #000; display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
-                                  iframe { width: 100%; height: 100%; border: none; }
-                                </style>
-                              </head>
-                              <body>
-                                <iframe 
-                                  src="https://www.youtube.com/embed/${extractYouTubeVideoId(item.url)}?rel=0&showinfo=0&controls=1&modestbranding=1"
-                                  allowfullscreen
-                                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                                ></iframe>
-                              </body>
-                              </html>
-                              `
-                            }}
-                            allowsFullscreenVideo={true}
-                            javaScriptEnabled={true}
-                            domStorageEnabled={true}
-                            startInLoadingState={true}
-                            onError={(syntheticEvent) => console.warn('YouTube WebView error: ', syntheticEvent.nativeEvent)}
-                            renderError={(errorDomain, errorCode, errorDesc) => (
-                              <View style={styles.mediaErrorContainer}>
-                              <Icon name="alert-circle-outline" size={48} color="#666" />
-                              <Text style={styles.mediaErrorText}>Video Preview Unavailable</Text>
-                              <TouchableOpacity
-                                style={styles.mediaErrorButton}
-                                onPress={() => Linking.openURL(item.url)}
-                              >
-                                <Icon name="youtube" size={20} color="#fff" />
-                                <Text style={styles.mediaErrorButtonText}>Open in YouTube</Text>
-                              </TouchableOpacity>
-                              </View>
-                            )}
-                            />
-                          </View>
+                            <View style={styles.contentCardHeader}>
+                              <Icon name="youtube" size={24} color="#FF0000" />
+                              <Text style={styles.contentCardTitle}>{item.title}</Text>
+                            </View>
+                            <Text style={styles.contentCardDescription}>{item.description}</Text>
+                            <View style={styles.mediaContainer}>
+                              <WebView
+                                style={{ flex: 1, backgroundColor: '#000' }}
+                                source={{
+                                  html: `
+                                    <!DOCTYPE html>
+                                    <html>
+                                    <head>
+                                      <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+                                      <style>
+                                        * { margin: 0; padding: 0; box-sizing: border-box; }
+                                        body { background: #000; display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
+                                        iframe { width: 100%; height: 100%; border: none; }
+                                      </style>
+                                    </head>
+                                    <body>
+                                      <iframe 
+                                        src="https://www.youtube.com/embed/${extractYouTubeVideoId(item.url)}?rel=0&showinfo=0&controls=1&modestbranding=1"
+                                        allowfullscreen
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                      ></iframe>
+                                    </body>
+                                    </html>
+                                  `
+                                }}
+                                allowsFullscreenVideo={true}
+                                javaScriptEnabled={true}
+                                domStorageEnabled={true}
+                                startInLoadingState={true}
+                                onError={(syntheticEvent) => console.warn('YouTube WebView error: ', syntheticEvent.nativeEvent)}
+                                renderError={(errorDomain, errorCode, errorDesc) => (
+                                  <View style={styles.mediaErrorContainer}>
+                                    <Icon name="alert-circle-outline" size={48} color="#666" />
+                                    <Text style={styles.mediaErrorText}>Video Preview Unavailable</Text>
+                                  </View>
+                                )}
+                              />
+                            </View>
+                            <TouchableOpacity
+                              style={styles.mediaErrorButton}
+                              onPress={() => Linking.openURL(item.url)}
+                            >
+                              <Icon name="youtube" size={20} color="#fff" />
+                              <Text style={styles.mediaErrorButtonText}>Watch on YouTube</Text>
+                            </TouchableOpacity>
                           </View>
                         );
                       
@@ -648,283 +651,106 @@ export default function ELearningModules() {
               {activeTab === "assignments" && (
                 <>
                 <Text style={styles.title}>ASSIGNMENTS</Text>
-                {assignments.length > 0 ? (
-                  assignments.map((assignment, index) => (
-                                         <TouchableOpacity
-                       key={index}
-                       style={styles.assignmentItem}
-                       onPress={() => {
-                         router.push({
-                           pathname: "/assignmentDetails",
-                           params: {
-                             assessmentId: assignment.assessment.id,
-                             assignedAssessmentId: assignment.id,
-                           }
-                         });
-                       }}
-                     >
-                      <View style={styles.assignmentContent}>
-                        <Text style={styles.assignmentTitle}>{assignment.assessment.title || 'Untitled Assignment'}</Text>
-                        <Text style={styles.assignmentDescription}>
-                          {assignment.assessment.description || 'No description available'}
-                        </Text>
-                        <View style={styles.assignmentMeta}>
-                          <Text style={styles.assignmentDeadline}>
-                            Deadline: {assignment.deadline ? new Date(assignment.deadline).toLocaleDateString() : 'No deadline'}
-                          </Text>
-                        </View>
-                      </View>
-                      <Icon name="chevron-right" size={24} color="#046a38" />
-                    </TouchableOpacity>
-                  ))
-                ) : (
-                  <View style={styles.noAssignments}>
-                    <Text style={styles.noAssignmentsText}>No assignments available or your section</Text>
-                  </View>
-                )}
+                  {assignments.length > 0 ? (
+                    <View style={styles.listContainer}>
+                      {assignments.map((assignment, index) => (
+                        <TouchableOpacity
+                          key={index}
+                          style={styles.assignmentItem}
+                          onPress={() => {
+                            router.push({
+                              pathname: "/assignmentDetails",
+                              params: {
+                                assessmentId: assignment.assessment.id,
+                                assignedAssessmentId: assignment.id,
+                              }
+                            });
+                          }}
+                        >
+                          <View style={styles.assignmentContent}>
+                            <Text style={styles.assignmentTitle}>{assignment.assessment.title || 'Untitled Assignment'}</Text>
+                            <Text style={styles.assignmentDescription}>
+                              {assignment.assessment.description || 'No description available'}
+                            </Text>
+                            <View style={styles.assignmentMeta}>
+                              <Text style={styles.assignmentDeadline}>
+                                Deadline: {assignment.deadline ? new Date(assignment.deadline).toLocaleDateString() : 'No deadline'}
+                              </Text>
+                            </View>
+                          </View>
+                          <Icon name="chevron-right" size={24} color="#046a38" />
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  ) : (
+                    <View style={styles.noAssignments}>
+                      <Icon name="clipboard-check-outline" size={48} color="#ccc" />
+                      <Text style={[styles.noAssignmentsText, { marginTop: 16 }]}>You're all caught up!
+No assignments are currently available for your section.</Text>
+                    </View>
+                  )}
               </>
               )}
 
               {activeTab === "quizzes" && (
                 <>
                 <Text style={styles.title}>QUIZZES</Text>
-                {quizzes.length > 0 ? (
-                  quizzes.map((quiz, index) => {
-
-                    let questionCount = 0;
-                    if (quiz.assessment?.questions) {
-                      try {
-                        const questions = typeof quiz.assessment.questions === 'string'
-                          ? JSON.parse(quiz.assessment.questions)
-                          : quiz.assessment.questions;
-                        questionCount = questions ? questions.length : 0;
-                      } catch (e) {
-                        console.error(`Error parsing questions for rendering:`, e);
-                        questionCount = 0;
-                      }
-                    }
-
-                    return (
-                    <TouchableOpacity
-                      key={index}
-                      style={styles.quizItem}
-                      onPress={() => {
-                        router.push({
-                          pathname: "/quizDetails",
-                          params: {
-                            assessmentId: quiz.assessment.id,
-                            assignedAssessmentId: quiz.id
+                  {quizzes.length > 0 ? (
+                    <View style={styles.listContainer}>
+                      {quizzes.map((quiz, index) => {
+                        let questionCount = 0;
+                        if (quiz.assessment?.questions) {
+                          try {
+                            const questions = typeof quiz.assessment.questions === 'string'
+                              ? JSON.parse(quiz.assessment.questions)
+                              : quiz.assessment.questions;
+                            questionCount = questions ? questions.length : 0;
+                          } catch (e) {
+                            console.error(`Error parsing questions for rendering:`, e);
+                            questionCount = 0;
                           }
-                        });
-                      }}
-                    >
-                      <View style={styles.quizContent}>
-                        <Text style={styles.quizTitle}>{quiz.assessment.title || 'Untitled Quiz'}</Text>
-                        <Text style={styles.quizDescription}>
-                          {quiz.assessment.description || 'No description available'}
-                        </Text>
-                        <View style={styles.quizMeta}>
-                          <Text style={styles.quizDeadline}>
-                            Deadline: {quiz.deadline ? new Date(quiz.deadline).toLocaleDateString() : 'No deadline'}
-                          </Text>
-                          <Text style={styles.quizType}>
-                            {quiz.assessment.questionCount || 0} questions
-                          </Text>
-                        </View>
+                        }
 
-                      </View>
-                      <Icon name="chevron-right" size={24} color="#046a38" />
-                    </TouchableOpacity>
-                    );
-                  })
-                ) : (
-                  <View style={styles.noQuizzes}>
-                    <Text style={styles.noQuizzesText}>No quizzes available for your section</Text>
-                  </View>
-                )}
-                </>
-              )}
-
-              {activeTab === "handouts" && (
-                <>
-                 <Text style={styles.title}>HANDOUTS</Text>
-                 {lessonHandouts.length > 0 ? (
-                   lessonHandouts.map((handout, index) => (
-                     <View key={index} style={styles.handoutCard}>
-                       {/* Handout Header Card */}
-                       <View style={styles.handoutItem}>
-                         <View style={styles.handoutContent}>
-                           <Text style={styles.handoutTitle}>{handout.handouts_title}</Text>
-                           <Text style={styles.handoutDate}>
-                             {new Date(handout.created_at).toLocaleDateString()}
-                           </Text>
-
-                                                       {handout.youtube_link && (
-                              <TouchableOpacity
-                                style={styles.handoutLink}
-                                onPress={() => Linking.openURL(handout.youtube_link)}
-                              >
-                                <Icon name="youtube" size={16} color="#FF0000" />
-                                <Text style={styles.handoutLinkText}>YouTube Video</Text>
-                                <Text style={styles.handoutLinkText}>(Tap to watch)</Text>
-                              </TouchableOpacity>
-                            )}
-
-                            {handout.file_attachments && (
-                              <TouchableOpacity
-                                style={styles.handoutLink}
-                                onPress={() => handleFileOpen(handout.file_attachments, handout.handouts_title)}
-                              >
-                                <Icon name="file-pdf-box" size={16} color="#D32F2F" />
-                                <Text style={styles.handoutLinkText}>File Attachment</Text>
-                                <Text style={styles.handoutLinkText}>(Tap to open)</Text>
-                              </TouchableOpacity>
-                            )}
-                         </View>
-                         <TouchableOpacity>
-                           {/* <Icon name="chevron-right" size={24} color="#046a38" /> */}
-                         </TouchableOpacity>
-                       </View>
-
-                       {/* Enhanced Viewer Card Below - Only show when active */}
-                       {activeViewer && activeViewer.title === handout.handouts_title && (
-                         <View style={styles.viewerCard}>
-                           <View style={styles.viewerCardHeader}>
-                             <View style={styles.viewerCardTitleSection}>
-                               <Icon
-                                 name={activeViewer.type === 'youtube' ? 'youtube' : 'file-pdf-box'}
-                                 size={24}
-                                 color={activeViewer.type === 'youtube' ? '#FF0000' : '#D32F2F'}
-                               />
-                                                               <Text style={styles.viewerCardTitle}>
-                                  {activeViewer.type === 'youtube' ? '' : 'File Attachment Viewer'}
+                        return (
+                          <TouchableOpacity
+                            key={index}
+                            style={styles.quizItem}
+                            onPress={() => {
+                              router.push({
+                                pathname: "/quizDetails",
+                                params: {
+                                  assessmentId: quiz.assessment.id,
+                                  assignedAssessmentId: quiz.id
+                                }
+                              });
+                            }}
+                          >
+                            <View style={styles.quizContent}>
+                              <Text style={styles.quizTitle}>{quiz.assessment.title || 'Untitled Quiz'}</Text>
+                              <Text style={styles.quizDescription}>
+                                {quiz.assessment.description || 'No description available'}
+                              </Text>
+                              <View style={styles.quizMeta}>
+                                <Text style={styles.quizDeadline}>
+                                  Deadline: {quiz.deadline ? new Date(quiz.deadline).toLocaleDateString() : 'No deadline'}
                                 </Text>
-                             </View>
-                             <TouchableOpacity
-                               style={styles.closeViewerButton}
-                               onPress={() => setActiveViewer(null)}
-                             >
-                               <Icon name="close" size={20} color="#666" />
-                             </TouchableOpacity>
-                           </View>
-
-                           <View style={styles.viewerCardContent}>
-                             {activeViewer.type === 'youtube' ? (
-                               <View style={styles.youtubeCard}>
-                                 <View style={styles.videoPlayerContainer}>
-                                                                       <WebView
-                                      style={{ width: '100%', height: 220 }}
-                                      source={{
-                                        html: `
-                                          <!DOCTYPE html>
-                                          <html>
-                                          <head>
-                                              <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                                              <style>
-                                                  body { margin: 0; padding: 0; background: #000; }
-                                                  .video-container { width: 100%; height: 100vh; display: flex; align-items: center; justify-content: center; }
-                                                  iframe { width: 100%; height: 100%; border: none; }
-                                              </style>
-                                          </head>
-                                          <body>
-                                              <div class="video-container">
-                                                  <iframe
-                                                      src="https://www.youtube.com/embed/${extractYouTubeVideoId(activeViewer.url)}?rel=0&showinfo=0&controls=1&modestbranding=1"
-                                                      allowfullscreen
-                                                      allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                                  ></iframe>
-                                              </div>
-                                          </body>
-                                          </html>
-                                        `
-                                      }}
-                                     allowsFullscreenVideo={true}
-                                     mediaPlaybackRequiresUserAction={false}
-                                     javaScriptEnabled={true}
-                                     domStorageEnabled={true}
-                                     startInLoadingState={true}
-                                     onError={(syntheticEvent) => {
-                                       const { nativeEvent } = syntheticEvent;
-                                       console.warn('WebView error: ', nativeEvent);
-                                     }}
-                                     onLoadEnd={() => console.log('YouTube video loaded')}
-                                     onMessage={(event) => console.log('WebView message:', event.nativeEvent.data)}
-                                   />
-                                 </View>
-
-                                 <View style={styles.videoInfo}>
-                                   <Text style={styles.videoUrl}>{activeViewer.url}</Text>
-                                   <View style={styles.videoButtons}>
-                                     <TouchableOpacity
-                                       style={styles.openInYouTubeButton}
-                                       onPress={() => Linking.openURL(activeViewer.url)}
-                                     >
-                                       <Icon name="youtube" size={16} color="#fff" />
-                                       <Text style={styles.openInYouTubeText}>Open in YouTube App</Text>
-                                     </TouchableOpacity>
-
-                                     <TouchableOpacity
-                                       style={styles.openInBrowserButton}
-                                       onPress={() => Linking.openURL(`https://www.youtube.com/watch?v=${extractYouTubeVideoId(activeViewer.url)}`)}
-                                     >
-                                       <Icon name="open-in-new" size={16} color="#fff" />
-                                       <Text style={styles.openInBrowserText}>Open in Browser</Text>
-                                     </TouchableOpacity>
-                                   </View>
-                                 </View>
-                               </View>
-                             ) : (
-                               <View style={styles.fileCard}>
-                                 <View style={styles.fileInfo}>
-                                   <Icon name="file-pdf-box" size={40} color="#D32F2F" />
-                                   <Text style={styles.fileName}>{handout.handouts_title}</Text>
-                                 </View>
-
-                                 {/* Inline PDF Viewer */}
-                                 <View style={styles.inlinePdfContainer}>
-                                   <WebView
-                                     style={styles.inlinePdfViewer}
-                                     source={{
-                                       uri: activeViewer.url,
-                                       headers: {
-                                         'Accept': 'application/pdf',
-                                       }
-                                     }}
-                                     javaScriptEnabled={true}
-                                     domStorageEnabled={true}
-                                     startInLoadingState={true}
-                                     onError={(syntheticEvent) => {
-                                       const { nativeEvent } = syntheticEvent;
-                                       console.warn('Inline PDF WebView error: ', nativeEvent);
-                                     }}
-                                     onLoadEnd={() => console.log('Inline PDF loaded successfully')}
-                                     renderError={(errorDomain, errorCode, errorDesc) => (
-                                       <View style={styles.inlinePdfErrorContainer}>
-                                         <Icon name="file-pdf-box" size={40} color="#D32F2F" />
-                                         <Text style={styles.inlinePdfErrorText}>PDF Preview Not Available</Text>
-                                   <TouchableOpacity
-                                           style={styles.inlineFallbackButton}
-                                     onPress={() => handleFileOpen(activeViewer.url, handout.handouts_title)}
-                                   >
-                                           <Icon name="open-in-new" size={16} color="#fff" />
-                                           <Text style={styles.inlineFallbackButtonText}>Open in External App</Text>
-                                   </TouchableOpacity>
-                                       </View>
-                                     )}
-                                   />
-                                 </View>
-                               </View>
-                             )}
-                           </View>
-                         </View>
-                       )}
-                     </View>
-                   ))
-                 ) : (
-                   <View style={styles.noHandouts}>
-                     <Text style={styles.noHandoutsText}>No handouts available for your section.</Text>
-                   </View>
-                 )}
+                                <Text style={styles.quizType}>
+                                  {quiz.assessment.questionCount || 0} questions
+                                </Text>
+                              </View>
+                            </View>
+                            <Icon name="chevron-right" size={24} color="#046a38" />
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  ) : (
+                    <View style={styles.noQuizzes}>
+                      <Icon name="trophy-outline" size={48} color="#ccc" />
+                      <Text style={[styles.noQuizzesText, { marginTop: 16 }]}>No quizzes are available right now.
+Check back later!</Text>
+                    </View>
+                  )}
                 </>
               )}
             </ScrollView>
@@ -986,7 +812,7 @@ export default function ELearningModules() {
                 </TouchableOpacity>
               </View>
             )}
-          </View>
+          </KeyboardAvoidingView>
         </View>
       </View>
 

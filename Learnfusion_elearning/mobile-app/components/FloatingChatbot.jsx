@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { Dimensions, TouchableOpacity, Image, View, Text, Modal, StyleSheet } from "react-native";
-import Animated, { useSharedValue,  useAnimatedStyle,  withSpring,  FadeIn,  FadeOut,} from "react-native-reanimated";
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from "react-native-reanimated";
 import { GestureDetector, Gesture } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
+import * as SecureStore from "expo-secure-store";
 import Fusionbot from "./FusionBot";
 import styles from "../styles/fchatbot";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const { width, height } = Dimensions.get("window");
 const INITIAL_X = width - 80;
@@ -22,9 +22,13 @@ export default function FloatingChatbot() {
 
   useEffect(() => {
     const fetchUser = async () => {
-      const userStr = await AsyncStorage.getItem("user");
-      if (userStr) {
-        setCurrentUser(JSON.parse(userStr));
+      try {
+        const userStr = await SecureStore.getItemAsync("user");
+        if (userStr) {
+          setCurrentUser(JSON.parse(userStr));
+        }
+      } catch (error) {
+        console.error("Error loading user from SecureStore:", error);
       }
     };
     fetchUser();
@@ -63,24 +67,19 @@ export default function FloatingChatbot() {
         </GestureDetector>
       )}
 
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={isChatOpen}
-        onRequestClose={() => setIsChatOpen(false)}
-      >
+      <Modal animationType="fade" transparent visible={isChatOpen} onRequestClose={() => setIsChatOpen(false)}>
         <View style={modalStyles.centeredView}>
           <View style={modalStyles.modalView}>
-              <View style={styles.chatHeader}>
-                <View style={styles.headerLeft}>
-                  <Image source={require("../assets/chatbot-icon.png")} style={styles.headerIcon} />
-                  <Text style={styles.headerTitle}>FusionBot</Text>
-                </View>
-                <TouchableOpacity onPress={() => setIsChatOpen(false)}>
-                  <Ionicons name="close" size={22} color="#fff" />
-                </TouchableOpacity>
+            <View style={styles.chatHeader}>
+              <View style={styles.headerLeft}>
+                <Image source={require("../assets/chatbot-icon.png")} style={styles.headerIcon} />
+                <Text style={styles.headerTitle}>FusionBot</Text>
               </View>
-              <Fusionbot currentUser={currentUser} />
+              <TouchableOpacity onPress={() => setIsChatOpen(false)}>
+                <Ionicons name="close" size={22} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            <Fusionbot currentUser={currentUser} />
           </View>
         </View>
       </Modal>
@@ -93,21 +92,18 @@ const modalStyles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: "rgba(0,0,0,0.5)",
   },
   modalView: {
-    width: '90%',
-    height: '80%',
+    width: "90%",
+    height: "80%",
     backgroundColor: "white",
     borderRadius: 20,
-    overflow: 'hidden',
+    overflow: "hidden",
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
-    elevation: 5
+    elevation: 5,
   },
 });

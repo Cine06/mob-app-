@@ -4,7 +4,7 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../utils/supabaseClient";
 import bcrypt from "react-native-bcrypt";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from "expo-secure-store";
 import styles from "../styles/cpass";
 
 const ChangePasswordScreen = () => {
@@ -20,13 +20,16 @@ const ChangePasswordScreen = () => {
   const handleChangePassword = async () => {
     try {
       setIsLoading(true);
+
       if (!currentPassword || !newPassword || !confirmPassword) {
         Alert.alert("Error", "Please fill in all fields.");
         setIsLoading(false);
         return;
       }
 
-      const user = JSON.parse(await AsyncStorage.getItem("user"));
+      // 🔒 Get user from SecureStore
+      const userJson = await SecureStore.getItemAsync("user");
+      const user = userJson ? JSON.parse(userJson) : null;
 
       if (!user) {
         Alert.alert("Error", "No user data found. Please log in again.");
@@ -34,6 +37,7 @@ const ChangePasswordScreen = () => {
         return;
       }
 
+      // 🧾 Fetch user record from Supabase
       const { data: currentUser, error: fetchError } = await supabase
         .from("users")
         .select("password")
@@ -46,14 +50,15 @@ const ChangePasswordScreen = () => {
         return;
       }
 
+      // 🔍 Verify current password
       const passwordMatch = bcrypt.compareSync(currentPassword, currentUser.password);
-      
       if (!passwordMatch) {
         Alert.alert("Error", "The current password you entered is incorrect.");
         setIsLoading(false);
         return;
       }
 
+      // ✅ Validate new passwords
       if (newPassword !== confirmPassword) {
         Alert.alert("Error", "New passwords do not match.");
         setIsLoading(false);
@@ -62,13 +67,18 @@ const ChangePasswordScreen = () => {
 
       const passwordRegex = /^(?=.*[a-zA-Z])(?=.*\d).{7,}$/;
       if (!passwordRegex.test(newPassword)) {
-        Alert.alert("Invalid Password", "Password must be at least 7 characters long and contain both letters and numbers.");
+        Alert.alert(
+          "Invalid Password",
+          "Password must be at least 7 characters long and contain both letters and numbers."
+        );
         setIsLoading(false);
         return;
       }
 
+      // 🔐 Hash new password
       const hashedNewPassword = bcrypt.hashSync(newPassword, 10);
 
+      // 🧭 Update in Supabase
       const { error: updateError } = await supabase
         .from("users")
         .update({ password: hashedNewPassword })
@@ -79,6 +89,9 @@ const ChangePasswordScreen = () => {
         setIsLoading(false);
         return;
       }
+
+      // 🧹 Optional: Clear stored session token for security
+      await SecureStore.deleteItemAsync("token");
 
       Alert.alert("Success", "Password changed successfully!");
       router.push("/profile");
@@ -108,8 +121,15 @@ const ChangePasswordScreen = () => {
             value={currentPassword}
             onChangeText={setCurrentPassword}
           />
-          <TouchableOpacity onPress={() => setShowCurrentPassword(prev => !prev)} style={styles.eyeIcon}>
-            <Ionicons name={showCurrentPassword ? "eye-off" : "eye"} size={24} color="gray" />
+          <TouchableOpacity
+            onPress={() => setShowCurrentPassword((prev) => !prev)}
+            style={styles.eyeIcon}
+          >
+            <Ionicons
+              name={showCurrentPassword ? "eye-off" : "eye"}
+              size={24}
+              color="gray"
+            />
           </TouchableOpacity>
         </View>
 
@@ -121,8 +141,15 @@ const ChangePasswordScreen = () => {
             value={newPassword}
             onChangeText={setNewPassword}
           />
-          <TouchableOpacity onPress={() => setShowNewPassword(prev => !prev)} style={styles.eyeIcon}>
-            <Ionicons name={showNewPassword ? "eye-off" : "eye"} size={24} color="gray" />
+          <TouchableOpacity
+            onPress={() => setShowNewPassword((prev) => !prev)}
+            style={styles.eyeIcon}
+          >
+            <Ionicons
+              name={showNewPassword ? "eye-off" : "eye"}
+              size={24}
+              color="gray"
+            />
           </TouchableOpacity>
         </View>
 
@@ -134,8 +161,15 @@ const ChangePasswordScreen = () => {
             value={confirmPassword}
             onChangeText={setConfirmPassword}
           />
-          <TouchableOpacity onPress={() => setShowConfirmPassword(prev => !prev)} style={styles.eyeIcon}>
-            <Ionicons name={showConfirmPassword ? "eye-off" : "eye"} size={24} color="gray" />
+          <TouchableOpacity
+            onPress={() => setShowConfirmPassword((prev) => !prev)}
+            style={styles.eyeIcon}
+          >
+            <Ionicons
+              name={showConfirmPassword ? "eye-off" : "eye"}
+              size={24}
+              color="gray"
+            />
           </TouchableOpacity>
         </View>
 

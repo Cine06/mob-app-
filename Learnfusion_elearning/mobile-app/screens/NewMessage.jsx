@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, FlatList, TouchableOpacity, Image, TextInput, ActivityIndicator, StyleSheet } from 'react-native';
+import { 
+  View, Text, FlatList, TouchableOpacity, Image, 
+  TextInput, ActivityIndicator, StyleSheet 
+} from 'react-native';
 import { useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as SecureStore from 'expo-secure-store';
 import { supabase } from '../utils/supabaseClient';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const NewMessageScreen = () => {
+export default function NewMessageScreen() {
   const router = useRouter();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -14,38 +17,46 @@ const NewMessageScreen = () => {
 
   useEffect(() => {
     const fetchCurrentUserAndUsers = async () => {
-      setLoading(true);
-      const userStr = await AsyncStorage.getItem('user');
-      if (userStr) {
+      try {
+        setLoading(true);
+
+        const userStr = await SecureStore.getItemAsync('user');
+        if (!userStr) {
+          console.warn('No stored user found.');
+          setLoading(false);
+          return;
+        }
+
         const user = JSON.parse(userStr);
         setCurrentUser(user);
 
         const { data, error } = await supabase
           .from('users')
           .select('id, first_name, last_name, profile_picture, role')
-          .neq('id', user.id) 
+          .neq('id', user.id)
           .neq('role', 'Admin');
 
         if (error) {
           console.error('Error fetching users:', error);
         } else {
-          setUsers(data);
+          setUsers(data || []);
         }
+      } catch (err) {
+        console.error('Unexpected error:', err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     fetchCurrentUserAndUsers();
   }, []);
 
   const filteredUsers = useMemo(() => {
-    if (!searchQuery) {
-      return users;
-    }
-    return users.filter(user => {
-      const fullName = `${user.first_name || ''} ${user.last_name || ''}`.toLowerCase();
-      return fullName.includes(searchQuery.toLowerCase());
-    });
+    if (!searchQuery) return users;
+    const query = searchQuery.toLowerCase();
+    return users.filter(u => 
+      `${u.first_name || ''} ${u.last_name || ''}`.toLowerCase().includes(query)
+    );
   }, [users, searchQuery]);
 
   const startChat = (user) => {
@@ -62,11 +73,17 @@ const NewMessageScreen = () => {
   const renderUserItem = ({ item }) => (
     <TouchableOpacity style={styles.userItem} onPress={() => startChat(item)}>
       <Image
-        source={item.profile_picture ? { uri: item.profile_picture } : require('../assets/default_profile.png')}
+        source={
+          item.profile_picture 
+            ? { uri: item.profile_picture } 
+            : require('../assets/default_profile.png')
+        }
         style={styles.avatar}
       />
       <View>
-        <Text style={styles.userName}>{`${item.first_name || ''} ${item.last_name || ''}`.trim()}</Text>
+        <Text style={styles.userName}>
+          {`${item.first_name || ''} ${item.last_name || ''}`.trim()}
+        </Text>
         <Text style={styles.userRole}>{item.role}</Text>
       </View>
     </TouchableOpacity>
@@ -108,20 +125,39 @@ const NewMessageScreen = () => {
       </View>
     </>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#046a38', paddingVertical: 15, paddingHorizontal: 10, paddingTop: 40 },
+  header: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between', 
+    backgroundColor: '#046a38', 
+    paddingVertical: 15, 
+    paddingHorizontal: 10, 
+    paddingTop: 40 
+  },
   headerTitle: { color: 'white', fontSize: 20, fontWeight: 'bold' },
-  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f0f2f5', margin: 10, borderRadius: 20, paddingHorizontal: 10 },
+  searchContainer: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    backgroundColor: '#f0f2f5', 
+    margin: 10, 
+    borderRadius: 20, 
+    paddingHorizontal: 10 
+  },
   searchIcon: { marginRight: 10 },
   searchInput: { flex: 1, height: 40, fontSize: 16 },
-  userItem: { flexDirection: 'row', alignItems: 'center', padding: 15, borderBottomWidth: 1, borderBottomColor: '#eee' },
+  userItem: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    padding: 15, 
+    borderBottomWidth: 1, 
+    borderBottomColor: '#eee' 
+  },
   avatar: { width: 50, height: 50, borderRadius: 25, marginRight: 15 },
   userName: { fontSize: 16, fontWeight: 'bold' },
   userRole: { fontSize: 14, color: 'gray' },
   emptyText: { textAlign: 'center', marginTop: 50, fontSize: 16, color: 'gray' },
 });
-
-export default NewMessageScreen;

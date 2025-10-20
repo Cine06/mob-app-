@@ -135,17 +135,27 @@ export default StyleSheet.create({
         fontStyle: "italic",
     },
     noAssignments: {
-        alignItems: "center",
-        padding: 40,
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+        marginTop: 50,
     },
     noAssignmentsText: {
         fontSize: 16,
         color: "#666",
-        fontStyle: "italic",
+        textAlign: 'center',
+        lineHeight: 24,
     },
     assignmentText: { 
         fontSize: 16, 
         color: "#046a38" 
+    },
+    listContainer: {
+        flex: 1,
+    },
+    listContentContainer: {
+        paddingBottom: 20,
     },
     downloadButton: { 
         marginTop: 10, 
@@ -200,16 +210,17 @@ export default StyleSheet.create({
         fontWeight: "500"
     },
     noQuizzes: {
-        backgroundColor: "#fff",
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
         padding: 20,
-        borderRadius: 8,
-        marginVertical: 10,
-        alignItems: "center"
+        marginTop: 50,
     },
     noQuizzesText: {
         fontSize: 16,
         color: "#666",
-        textAlign: "center"
+        textAlign: "center",
+        lineHeight: 24,
     },
     subtitle: { 
         fontSize: 16, 

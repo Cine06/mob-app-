@@ -1,212 +1,242 @@
-import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+  SafeAreaView,
+  RefreshControl,
+} from "react-native";
 import { Stack, useRouter, useFocusEffect } from "expo-router";
 import { FontAwesome5, Ionicons, MaterialIcons } from "@expo/vector-icons";
 import BottomNav from "../components/BottomNav";
 import styles from "../styles/notif";
-import { useState, useCallback, useMemo } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import { supabase } from "../utils/supabaseClient";
+import dayjs from "dayjs";
 
 export default function Notifications() {
   const router = useRouter();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [readNotifIds, setReadNotifIds] = useState(new Set());
+  const [refreshing, setRefreshing] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedNotifications, setSelectedNotifications] = useState(new Set());
 
-  const fetchNotifications = async (currentReadIds) => {
-    setLoading(true);
+  // 🔐 Secure user fetch
+  const getUser = async () => {
+    const userStr = await SecureStore.getItemAsync("user");
+    return userStr ? JSON.parse(userStr) : null;
+  };
+
+  // 🔄 Fetch notifications
+  const fetchNotifications = async () => {
     try {
-      const userStr = await AsyncStorage.getItem("user");
-      if (!userStr) {
-        setLoading(false);
-        return;
-      }
-      const user = JSON.parse(userStr);
+      setLoading(true);
+      const user = await getUser();
+      if (!user) return;
 
-      const notifList = [];
+      const { data, error } = await supabase
+        .from("user_notifications")
+        .select(
+          `
+          id,
+          user_id,
+          read_at,
+          dismissed_at,
+          created_at,
+          notifications (
+            id,
+            type,
+            title,
+            description,
+            event_date,
+            route
+          )
+        `
+        )
+        .eq("user_id", user.id)
+        .is("dismissed_at", null)
+        .order("created_at", { ascending: false });
 
-      const { data: messages, error: messagesError } = await supabase
-        .from('messages')
-        .select('id, created_at, sender:sender_id(id, first_name, last_name, profile_picture)')
-        .eq('receiver_id', user.id)
-        .eq('read', false); 
+      if (error) throw error;
 
-      if (messagesError) throw messagesError;
-
-      messages.forEach(msg => {
-        notifList.push({
-          id: `msg-${msg.id}`,
-          message: `New message from ${msg.sender.first_name || 'user'}`,
-          eventDate: new Date(msg.created_at),
-          route: {
-            pathname: '/chat',
-            params: {
-              senderId: msg.sender.id,
-              senderName: `${msg.sender.first_name} ${msg.sender.last_name}`.trim() || 'User',
-              senderAvatar: msg.sender.profile_picture
-            }},
-          icon: 'envelope'
-        });
+      const formatted = data.map((item) => {
+        const notif = item.notifications;
+        const isMessageType = notif?.type === "message";
+        return {
+          id: notif?.id,
+          userNotifId: item.id,
+          title: notif?.title,
+          message: isMessageType
+            ? "You have a new message"
+            : notif?.description || notif?.title,
+          type: notif?.type,
+          eventDate: notif?.event_date,
+          route: notif?.route,
+          isRead: !!item.read_at,
+        };
       });
 
-      if (user.section_id) {
-        const { data: assigned, error: assignedError } = await supabase
-          .from('assigned_assessments')
-          .select('id, deadline, assigned_at, assessment:assessments(id, title, description, questions, type)')
-          .eq('section_id', user.section_id)
-          .gte('deadline', new Date().toISOString());
-
-        if (assignedError) throw assignedError;
-
-        const NEW_ITEM_WINDOW_MS = 24 * 60 * 60 * 1000; 
-        const DEADLINE_WINDOW_MS = 2 * 24 * 60 * 60 * 1000; 
-
-        assigned.forEach(item => {
-          const deadline = new Date(item.deadline);
-          const assignedAt = new Date(item.assigned_at);
-          const now = new Date();
-
-          if (now - assignedAt < NEW_ITEM_WINDOW_MS) {
-            notifList.push({
-              id: `new-as-${item.id}`,
-              message: `New ${item.assessment.type}: ${item.assessment.title}`,
-              eventDate: assignedAt,
-              route: {
-                pathname: '/lessons',
-                params: {
-                  initialTab: item.assessment.type === 'Quiz' ? 'quizzes' : 'assignments',
-                  itemId: item.id
-                }
-              },
-              icon: 'clipboard-list'
-            });
-          }
-
-          if (deadline - now > 0 && deadline - now < DEADLINE_WINDOW_MS) {
-            notifList.push({
-              id: `due-as-${item.id}`,
-              message: `Due soon: ${item.assessment.title}`,
-              eventDate: deadline, 
-              route: {
-                pathname: '/lessons',
-                params: {
-                  initialTab: item.assessment.type === 'Quiz' ? 'quizzes' : 'assignments',
-                  itemId: item.id
-                }
-              },
-              icon: 'clock'
-            });
-          }
-        });
-
-        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-        const { data: newHandouts, error: handoutsError } = await supabase.rpc('get_new_handouts_for_section', {
-          p_section_id: user.section_id,
-          p_since: twentyFourHoursAgo
-        });
-
-        if (handoutsError) throw handoutsError;
-
-        newHandouts.forEach(handout => {
-          notifList.push({
-            id: `hnd-${handout.id}`,
-            message: `New Handout: ${handout.handouts_title}`,
-            eventDate: new Date(handout.created_at),
-            route: {
-              pathname: '/handoutDetails',
-              params: {
-                handout_id: handout.id
-              }
-            },
-            icon: 'file-alt'
-          });
-        });
-      }
-
-      notifList.sort((a, b) => b.eventDate - a.eventDate);
-
-      const formattedNotifications = notifList.map(notif => {
-        const eventDate = new Date(notif.eventDate);
-        const timeString = eventDate.toLocaleString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric',
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true,
-        });
-
-        let time;
-        if (notif.message.startsWith('Due soon:')) {
-          time = `Due on ${timeString}`;
-        } else {
-          time = timeString;
-        }
-        const isRead = currentReadIds.has(notif.id);
-        return { ...notif, time, isRead };
-      });
-
-      setNotifications(formattedNotifications);
-
-    } catch (error) {
-      console.error("Error fetching notifications:", error.message);
-      setNotifications([]); 
+      setNotifications(formatted);
+    } catch (err) {
+      console.error("Error fetching notifications:", err);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
+  // ✅ Mark as read
+  const markAsRead = async (notifId) => {
+    try {
+      const user = await getUser();
+      if (!user) return;
+
+      await supabase
+        .from("user_notifications")
+        .update({ read_at: new Date().toISOString() })
+        .eq("user_id", user.id)
+        .eq("notification_id", notifId);
+
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === notifId ? { ...n, isRead: true } : n))
+      );
+    } catch (err) {
+      console.error("Error marking as read:", err);
+    }
+  };
+
+  // 🖱️ Handle notification tap
+  const handleNotificationPress = async (item) => {
+    await markAsRead(item.id);
+
+    if (item.type === "handout") {
+      router.push({
+        pathname: "/lessons",
+        params: {
+          initialTab: "lessons",
+          itemId: item.id,
+        },
+      });
+    } else if (item.route && item.route.pathname) {
+      try {
+        router.push({
+          pathname: item.route.pathname,
+          params: item.route.params || {},
+        });
+      } catch (e) {
+        console.warn("Invalid route:", item.route);
+      }
+    }
+  };
+
+  // 🔁 Pull-to-refresh
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchNotifications();
+  };
+
+  // ⚡ Realtime listener (INSERT + UPDATE)
+  useEffect(() => {
+    let subscription;
+    const initRealtime = async () => {
+      const user = await getUser();
+      if (!user) return;
+
+      subscription = supabase
+        .channel("realtime_user_notifications")
+        // ✅ INSERT → new notification
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "user_notifications",
+            filter: `user_id=eq.${user.id}`,
+          },
+          async (payload) => {
+            const { data: notifData } = await supabase
+              .from("notifications")
+              .select("id, type, title, description, event_date, route")
+              .eq("id", payload.new.notification_id)
+              .single();
+
+            if (notifData) {
+              const isMessageType = notifData.type === "message";
+              const newNotif = {
+                id: notifData.id,
+                userNotifId: payload.new.id,
+                title: notifData.title,
+                message: isMessageType
+                  ? "You have a new message"
+                  : notifData.description || notifData.title,
+                type: notifData.type,
+                eventDate: notifData.event_date,
+                route: notifData.route,
+                isRead: false,
+              };
+              setNotifications((prev) => [newNotif, ...prev]);
+            }
+          }
+        )
+        // ✅ UPDATE → read_at / dismissed_at changed
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "user_notifications",
+            filter: `user_id=eq.${user.id}`,
+          },
+          async (payload) => {
+            const { new: updatedRow } = payload;
+
+            // If dismissed, remove it from local list
+            if (updatedRow.dismissed_at) {
+              setNotifications((prev) =>
+                prev.filter((n) => n.id !== updatedRow.notification_id)
+              );
+              return;
+            }
+
+            // If marked read, update isRead status
+            if (updatedRow.read_at) {
+              setNotifications((prev) =>
+                prev.map((n) =>
+                  n.id === updatedRow.notification_id
+                    ? { ...n, isRead: true }
+                    : n
+                )
+              );
+            }
+          }
+        )
+        .subscribe();
+    };
+
+    initRealtime();
+    return () => {
+      if (subscription) supabase.removeChannel(subscription);
+    };
+  }, []);
+
+  // 🧭 Refresh on screen refocus
   useFocusEffect(
     useCallback(() => {
-      const loadReadStatus = async () => {
-        try {
-          const storedIds = await AsyncStorage.getItem('readNotificationIds');
-          const idsSet = storedIds ? new Set(JSON.parse(storedIds)) : new Set();
-          setReadNotifIds(idsSet);
-          fetchNotifications(idsSet);
-        } catch (e) {
-          console.error("Failed to load read notification statuses.", e);
-          fetchNotifications(new Set()); 
-        }
-      };
-      loadReadStatus();
+      fetchNotifications();
     }, [])
   );
 
-  const handleNotificationPress = async (item) => {
-  setNotifications(currentNotifs =>
-    currentNotifs.map(n => (n.id === item.id ? { ...n, isRead: true } : n))
-  );
-
-  const updatedReadIds = new Set(readNotifIds).add(item.id);
-  setReadNotifIds(updatedReadIds);
-  await AsyncStorage.setItem('readNotificationIds', JSON.stringify(Array.from(updatedReadIds)));
-
-  if (item.id.startsWith('msg-')) {
-    router.push({
-      pathname: '/messagedetails',
-      params: {
-        name: item.route.params.senderName,
-        avatar: item.route.params.senderAvatar,
-        receiverId: item.route.params.senderId,
-      },
-    });
-  } else {
-    router.push(item.route);
-  }
-};
-
-
+  // 🗑️ Multi-select handlers
   const toggleSelection = (notificationId) => {
-    setSelectedNotifications(prev => {
+    setSelectedNotifications((prev) => {
       const newSelection = new Set(prev);
-      if (newSelection.has(notificationId)) {
-        newSelection.delete(notificationId);
-      } else {
-        newSelection.add(notificationId);
-      }
+      newSelection.has(notificationId)
+        ? newSelection.delete(notificationId)
+        : newSelection.add(notificationId);
       return newSelection;
     });
   };
@@ -215,21 +245,20 @@ export default function Notifications() {
     if (selectedNotifications.size === notifications.length) {
       setSelectedNotifications(new Set());
     } else {
-      const allNotificationIds = new Set(notifications.map(n => n.id));
-      setSelectedNotifications(allNotificationIds);
+      setSelectedNotifications(new Set(notifications.map((n) => n.id)));
     }
   };
 
   const dismissNotifications = async (idsToDismiss) => {
     if (idsToDismiss.size === 0) return;
+    const user = await getUser();
+    await supabase
+      .from("user_notifications")
+      .update({ dismissed_at: new Date().toISOString() })
+      .in("notification_id", Array.from(idsToDismiss))
+      .eq("user_id", user.id);
 
-    setNotifications(currentNotifs =>
-      currentNotifs.filter(n => !idsToDismiss.has(n.id))
-    );
-
-    const updatedReadIds = new Set([...readNotifIds, ...idsToDismiss]);
-    setReadNotifIds(updatedReadIds);
-    await AsyncStorage.setItem('readNotificationIds', JSON.stringify(Array.from(updatedReadIds)));
+    setNotifications((curr) => curr.filter((n) => !idsToDismiss.has(n.id)));
   };
 
   const handleDeleteSelected = () => {
@@ -239,7 +268,7 @@ export default function Notifications() {
     }
     Alert.alert(
       "Confirm Deletion",
-      `Are you sure you want to delete ${selectedNotifications.size} notification(s)?`,
+      `Delete ${selectedNotifications.size} notification(s)?`,
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -255,130 +284,153 @@ export default function Notifications() {
     );
   };
 
-  const isAllSelected = useMemo(() => {
-    return notifications.length > 0 && selectedNotifications.size === notifications.length;
-  }, [selectedNotifications, notifications]);
-
-  const renderItem = ({ item }) => {
-  const isSelected = selectedNotifications.has(item.id);
-  return (
-    <TouchableOpacity
-      style={[
-        styles.notificationItem,
-        !item.isRead && styles.unreadItem,
-        isSelected && styles.selectedItem
-      ]}
-      onPress={() => selectionMode ? toggleSelection(item.id) : handleNotificationPress(item)}
-      onLongPress={() => {
-        if (!selectionMode) {
-          setSelectionMode(true);
-          toggleSelection(item.id);
-        }
-      }}
-    >
-      {selectionMode && (
-        <MaterialIcons
-          name={isSelected ? "check-box" : "check-box-outline-blank"}
-          size={24}
-          color="#046a38"
-          style={{ marginRight: 15 }}
-        />
-      )}
-      <FontAwesome5
-        name={item.icon || 'bell'}
-        size={20}
-        color="#046a38"
-        style={styles.icon}
-      />
-      <View style={{ flex: 1 }}>
-        <Text style={styles.message}>{item.message}</Text>
-        <Text style={styles.time}>{item.time}</Text>
-      </View>
-    </TouchableOpacity>
+  const isAllSelected = useMemo(
+    () =>
+      notifications.length > 0 &&
+      selectedNotifications.size === notifications.length,
+    [notifications, selectedNotifications]
   );
-};
 
-const SelectionHeader = ({ onCancel, selectedCount, onSelectAll, isAllSelected, onDelete }) => (
-  <View style={{ 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'space-between', 
-    paddingHorizontal: 10, 
-    paddingVertical: 8,
-    width: '100%'
-  }}>
-    <TouchableOpacity onPress={onCancel}>
-      <Ionicons name="close" size={24} color="#333" />
-    </TouchableOpacity>
-
-    <Text style={styles.headerText}>
-      {selectedCount} Selected
-    </Text>
-
-    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-      <TouchableOpacity onPress={onSelectAll} style={{ marginRight: 20 }}>
-        <MaterialIcons 
-          name={isAllSelected ? "deselect" : "select-all"} 
-          size={24} 
-          color="#333" 
-        />
-      </TouchableOpacity>
-      <TouchableOpacity onPress={onDelete}>
-        <FontAwesome5 name="trash" size={20} color="red" />
-      </TouchableOpacity>
-    </View>
-  </View>
-);
-
-const DefaultHeader = ({ onEnableSelection }) => (
-  <View style={{ 
-    flexDirection: "row", 
-    alignItems: "center", 
-    justifyContent: "space-between",
-    paddingHorizontal: 10, 
-    marginBottom: 10,
-    width: '100%'
-  }}>
-    <Text style={styles.header}>Notifications</Text>
-    <TouchableOpacity onPress={onEnableSelection}>
-      <FontAwesome5 name="trash-alt" size={20} color="red" />
-    </TouchableOpacity>
-  </View>
-);
-
-  return (
-    <>
-    <Stack.Screen options={{ headerShown: false }} />
-     <Stack.Screen options={{ title: "Notifications" }} />
-      <View style={styles.container}> 
-        <View style={styles.headerContainer}>
-          {selectionMode ? (
-            <SelectionHeader 
-              selectedCount={selectedNotifications.size}
-              isAllSelected={isAllSelected}
-              onCancel={() => { setSelectionMode(false); setSelectedNotifications(new Set()); }}
-              onSelectAll={handleSelectAll}
-              onDelete={handleDeleteSelected}
-            />
-          ) : (
-            <DefaultHeader onEnableSelection={() => setSelectionMode(true)} />
-          )}
-        </View>
-
-        {loading ? (
-          <ActivityIndicator style={{ flex: 1 }} size="large" color="#046a38" />
-        ) : notifications.length === 0 ? (
-          <Text style={styles.noNotifications}>No new notifications</Text>
-        ) : (
-          <FlatList
-            data={notifications}
-            renderItem={renderItem}
-            keyExtractor={(item) => item.id.toString()}
+  // 🎨 Render single notification
+  const renderItem = ({ item }) => {
+    const isSelected = selectedNotifications.has(item.id);
+    return (
+      <TouchableOpacity
+        style={[
+          styles.notificationItem,
+          !item.isRead && styles.unreadItem,
+          isSelected && styles.selectedItem,
+        ]}
+        onPress={() =>
+          selectionMode
+            ? toggleSelection(item.id)
+            : handleNotificationPress(item)
+        }
+        onLongPress={() => {
+          if (!selectionMode) {
+            setSelectionMode(true);
+            toggleSelection(item.id);
+          }
+        }}
+      >
+        {selectionMode && (
+          <MaterialIcons
+            name={isSelected ? "check-box" : "check-box-outline-blank"}
+            size={24}
+            color="#046a38"
+            style={{ marginRight: 15 }}
           />
         )}
-        
+        <FontAwesome5
+          name={
+            item.type === "message"
+              ? "envelope"
+              : item.type === "assignment"
+              ? "clipboard-list"
+              : item.type === "quiz"
+              ? "question-circle"
+              : item.type === "handout"
+              ? "file-alt"
+              : "bell"
+          }
+          size={20}
+          color="#046a38"
+          style={styles.icon}
+        />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.message}>{item.message}</Text>
+          <Text style={styles.time}>
+            {dayjs(item.eventDate).format("MMM D, YYYY h:mm A")}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  // 🧱 Header components
+  const SelectionHeader = ({
+    onCancel,
+    selectedCount,
+    onSelectAll,
+    isAllSelected,
+    onDelete,
+  }) => (
+    <View style={styles.selectionHeader}>
+      <TouchableOpacity onPress={onCancel}>
+        <Ionicons name="close" size={24} color="#333" />
+      </TouchableOpacity>
+
+      <Text style={styles.headerText}>{selectedCount} Selected</Text>
+
+      <View style={{ flexDirection: "row", alignItems: "center" }}>
+        <TouchableOpacity onPress={onSelectAll} style={{ marginRight: 20 }}>
+          <MaterialIcons
+            name={isAllSelected ? "deselect" : "select-all"}
+            size={24}
+            color="#333"
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={onDelete}>
+          <FontAwesome5 name="trash" size={20} color="red" />
+        </TouchableOpacity>
       </View>
-      <BottomNav />
+    </View>
+  );
+
+  const DefaultHeader = ({ onEnableSelection }) => (
+    <View style={styles.defaultHeader}>
+      <Text style={styles.header}>Notifications</Text>
+      <TouchableOpacity onPress={onEnableSelection}>
+        <FontAwesome5 name="trash-alt" size={20} color="red" />
+      </TouchableOpacity>
+    </View>  
+  );
+
+  // 🧱 Render main
+  return (
+    <>
+      <SafeAreaView style={styles.container}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={{ flex: 1 }}>
+          <View style={styles.headerContainer}>
+            {selectionMode ? (
+              <SelectionHeader
+                selectedCount={selectedNotifications.size}
+                isAllSelected={isAllSelected}
+                onCancel={() => {
+                  setSelectionMode(false);
+                  setSelectedNotifications(new Set());
+                }}
+                onSelectAll={handleSelectAll}
+                onDelete={handleDeleteSelected}
+              />
+            ) : (
+              <DefaultHeader onEnableSelection={() => setSelectionMode(true)} />
+            )}
+          </View>
+
+          {loading ? (
+            <ActivityIndicator style={{ flex: 1 }} size="large" color="#046a38" />
+          ) : notifications.length === 0 ? (
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh}>
+              <Text style={styles.noNotifications}>No new notifications</Text>
+            </RefreshControl>
+          ) : (
+            <FlatList
+              data={notifications}
+              renderItem={renderItem}
+              keyExtractor={(item) => item.userNotifId.toString()}
+              contentContainerStyle={{ paddingBottom: 80 }}
+              refreshControl={
+                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+              }
+            />
+          )}
+        </View>
+      </SafeAreaView>
+      
+        <BottomNav />
     </>
   );
 }

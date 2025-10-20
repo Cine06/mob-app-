@@ -1,41 +1,46 @@
 import React, { useState, useRef, useEffect } from "react";
-import {  View,  Text,  TextInput,  TouchableOpacity,  ScrollView,  StyleSheet,  Image,  KeyboardAvoidingView,  Platform,  ActivityIndicator,  Keyboard} from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  StyleSheet,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+  Keyboard,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
 import Markdown from "react-native-markdown-display";
-import { COHERE_API_KEY } from "@env";
 import styles from "../styles/fusionbot";
 import { supabase } from "../utils/supabaseClient";
+import Constants from "expo-constants";
 
-const systemPrompt = `You are FusionBot, a helpful assistant that only answers questions related to a specific set of Java programming topics.
-The allowed topics are:
-1. Java Basics: HelloWorld, input/output, date.
-2. Variables & Data Types: primitives (int, double, etc.), objects, String, StringBuilder, object lifecycle, System.gc().
-3. Operators & Decision Constructs: arithmetic, relational, logical, if-else, switch, equality (== vs .equals()).
-4. Arrays & Collections: 1D/2D arrays, ArrayList.
-5. Looping Constructs: for, while, do-while, break, continue.
-6. Object-Oriented Programming (OOP): classes, objects, constructors, encapsulation (getters/setters), inheritance (extends), polymorphism, abstraction (abstract classes, interfaces), and exception handling (try-catch).
-If a user asks a question outside this scope, you must politely state that you can only answer questions about these specific Java topics. Do not answer the off-topic question.`;
+const COHERE_API_KEY =
+  Constants.expoConfig?.extra?.COHERE_API_KEY ??
+  Constants.manifest?.extra?.COHERE_API_KEY ??
+  process.env.COHERE_API_KEY;
+const systemPrompt = `You are FusionBot, a helpful assistant that only answers questions related to Java programming topics...`;
 
 const javaKeywords = [
-  "java", "jvm", "jdk", "jre", "compile", "run", "program", "code", "syntax", "debugging", "hi", "hello",
-  "helloworld", "main", "system.out.println", "input", "output", "scanner", "date",
-  "variable", "data type", "primitive", "int", "double", "boolean", "char", "byte", "short", "long", "float",
-  "object", "reference", "string", "stringbuilder", "field", "lifecycle", "garbage collection", "system.gc",
-  "operator", "arithmetic", "relational", "logical", "precedence", "parentheses", "equality", "==", ".equals",
-  "if", "else", "switch", "case",
-  "array", "1d", "2d", "multidimensional", "collection", "arraylist", "add", "remove", "get", "size",
-  "loop", "while", "for", "do-while", "enhanced-for", "break", "continue",
-  "oop", "object-oriented", "class", "object", "field", "constructor", "method", "encapsulation", "private",
-  "public", "protected", "getter", "setter", "inheritance", "superclass", "subclass", "extends", "override",
-  "tostring", "equals", "polymorphism", "upcasting", "dispatch", "abstraction", "abstract", "interface",
-  "implements", "exception", "handling", "try", "catch", "finally", "throw", "throws", "custom exception", "uml"
+  "java", "jvm", "jdk", "jre", "compile", "run", "program", "code", "syntax",
+  "variable", "data type", "int", "double", "boolean", "string", "scanner",
+  "if", "else", "switch", "for", "while", "do-while", "array", "arraylist",
+  "oop", "class", "object", "constructor", "method", "inheritance", "extends",
+  "polymorphism", "abstract", "interface", "exception", "try", "catch",
 ];
 const restrictedWords = ["javarice", "java rice", "rice"];
 
 const initialChatHistory = [
   { role: "SYSTEM", message: systemPrompt },
-  { role: "CHATBOT", message: "Hi, I’m FusionBot! You can ask me questions related to Java programming." }
+  {
+    role: "CHATBOT",
+    message:
+      "👋 Hi, I’m FusionBot! Ask me anything about Java programming.",
+  },
 ];
 
 const FusionBot = ({ currentUser }) => {
@@ -49,33 +54,34 @@ const FusionBot = ({ currentUser }) => {
   }, []);
 
   const isMessageOnTopic = (message) => {
-    const lowerCaseMessage = message.toLowerCase();
-    const isRelated = javaKeywords.some(keyword => lowerCaseMessage.includes(keyword));
-    const isRestrictedTopic = restrictedWords.some(word => lowerCaseMessage.includes(word));
-    return isRelated && !isRestrictedTopic;
+    const lower = message.toLowerCase();
+    const related = javaKeywords.some((k) => lower.includes(k));
+    const restricted = restrictedWords.some((w) => lower.includes(w));
+    return related && !restricted;
   };
 
   const saveMessagesToDb = async (messagesToSave) => {
     if (!currentUser) return;
-    const records = messagesToSave.map(msg => ({
+    const records = messagesToSave.map((msg) => ({
       user_id: currentUser.id,
-      sender: msg.role === 'USER' ? 'user' : 'bot',
+      sender: msg.role === "USER" ? "user" : "bot",
       text: msg.message,
     }));
-    const { error } = await supabase.from('chatbot_history').insert(records);
-    if (error) {
-      console.error("Error saving chat history:", error.message);
-    }
+    await supabase.from("chatbot_history").insert(records);
   };
 
-  const getBotResponse = async (currentChatHistory, userMessage) => {
+  const getBotResponse = async (chat, message) => {
+    if (!COHERE_API_KEY) {
+  return "⚠️ Missing API key configuration. Please contact support.";
+}
+
     try {
-      const response = await axios.post(
+      const res = await axios.post(
         "https://api.cohere.ai/v1/chat",
         {
           model: "command-a-03-2025",
-          chat_history: currentChatHistory.filter(m => m.role !== 'SYSTEM'),
-          message: userMessage,
+          chat_history: chat.filter((m) => m.role !== "SYSTEM"),
+          message,
         },
         {
           headers: {
@@ -84,11 +90,9 @@ const FusionBot = ({ currentUser }) => {
           },
         }
       );
-
-      return response.data?.text?.trim() || "Sorry, I couldn’t find an answer for that.";
-    } catch (err) {
-      console.error("API Error in handleSend:", err.response?.data || err.message);
-      return "Oops! Something went wrong. Please check your connection or try again later.";
+      return res.data?.text?.trim() || "Sorry, I couldn’t find an answer for that.";
+    } catch {
+      return "⚠️ Oops! Something went wrong. Please try again.";
     }
   };
 
@@ -101,83 +105,66 @@ const FusionBot = ({ currentUser }) => {
     const loadMessages = async () => {
       setLoading(true);
       const { data, error } = await supabase
-        .from('chatbot_history')
-        .select('sender, text')
-        .eq('user_id', currentUser.id)
-        .order('created_at', { ascending: true });
+        .from("chatbot_history")
+        .select("sender, text")
+        .eq("user_id", currentUser.id)
+        .order("created_at", { ascending: true });
 
-      if (error) {
-        console.error("Error loading messages:", error);
-        setChatHistory([{ role: "CHATBOT", message: "Could not load previous conversation." }]);
-      } else if (data && data.length > 0) {
-        const history = data.map(msg => ({
-          role: msg.sender === 'user' ? 'USER' : 'CHATBOT',
-          message: msg.text
-        }));
-        setChatHistory([initialChatHistory[0], ...history]); 
-      } else {
+      if (error || !data?.length) {
         setChatHistory(initialChatHistory);
+      } else {
+        const history = data.map((m) => ({
+          role: m.sender === "user" ? "USER" : "CHATBOT",
+          message: m.text,
+        }));
+        setChatHistory([initialChatHistory[0], ...history]);
       }
       setLoading(false);
     };
-
     loadMessages();
   }, [currentUser]);
 
   useEffect(() => {
     scrollToBottom();
-  }, [chatHistory, loading, scrollToBottom]);
+  }, [chatHistory, loading]);
 
   const handleSend = React.useCallback(async () => {
     if (!inputText.trim() || !currentUser) return;
 
-    const userMessageText = inputText.trim();
-    const userMessage = { role: "USER", message: userMessageText };
-    
+    const userMsg = { role: "USER", message: inputText.trim() };
     setInputText("");
-    setChatHistory(prev => [...prev, userMessage]);
+    setChatHistory((prev) => [...prev, userMsg]);
     setLoading(true);
 
     try {
-      let botMessageText;
-      if (isMessageOnTopic(userMessageText)) {
-        botMessageText = await getBotResponse([...chatHistory, userMessage], userMessageText);
+      let botReply;
+      if (isMessageOnTopic(userMsg.message)) {
+        botReply = await getBotResponse([...chatHistory, userMsg], userMsg.message);
       } else {
-        botMessageText = "Sorry, I can only answer questions related to Java programming.";
+        botReply = "🚫 Sorry, I can only answer questions about Java programming.";
       }
-
-      const botMessage = { role: "CHATBOT", message: botMessageText };
-      setChatHistory(prev => [...prev, botMessage]);
-      saveMessagesToDb([userMessage, botMessage]);
+      const botMsg = { role: "CHATBOT", message: botReply };
+      setChatHistory((prev) => [...prev, botMsg]);
+      saveMessagesToDb([userMsg, botMsg]);
     } finally {
       setLoading(false);
     }
   }, [inputText, currentUser, chatHistory]);
 
-  const handleRefresh = React.useCallback(async () => {
+  const handleRefresh = async () => {
     if (!currentUser) return;
+    await supabase.from("chatbot_history").delete().eq("user_id", currentUser.id);
+    setInputText("");
+    setChatHistory(initialChatHistory);
+  };
 
-    const { error } = await supabase
-      .from('chatbot_history')
-      .delete()
-      .eq('user_id', currentUser.id);
-
-    if (error) {
-      console.error("Error clearing conversation:", error);
-      alert("Could not clear conversation. Please try again.");
-    } else {
-      setInputText("");
-      setChatHistory(initialChatHistory);
-    }
-  }, [currentUser]);
-
-  const renderableChat = chatHistory.filter(m => m.role !== 'SYSTEM');
+  const chat = chatHistory.filter((m) => m.role !== "SYSTEM");
 
   return (
     <KeyboardAvoidingView
       style={styles.body}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
     >
       <View style={{ flex: 1 }}>
         <ScrollView
@@ -185,12 +172,12 @@ const FusionBot = ({ currentUser }) => {
           contentContainerStyle={{ paddingBottom: 20 }}
           ref={scrollRef}
           keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={true}
+          showsVerticalScrollIndicator={false}
           onScrollBeginDrag={Keyboard.dismiss}
         >
-          {renderableChat.map((msg, index) => (
+          {chat.map((msg, i) => (
             <View
-              key={index}
+              key={i}
               style={[
                 styles.messageContainer,
                 msg.role === "CHATBOT" ? styles.botContainer : styles.userContainer,
@@ -209,11 +196,50 @@ const FusionBot = ({ currentUser }) => {
                 ]}
               >
                 {msg.role === "CHATBOT" ? (
-                  <Markdown style={{ body: styles.botText }}>{msg.message}</Markdown>
+                  <Markdown
+  style={{
+    body: { color: "#FFFFFF", fontSize: 15, lineHeight: 22 },
+    strong: { color: "#FFD700" },
+
+    fence: {
+      backgroundColor: "#1E1E1E",
+      color: "#FFFFFF",
+      borderRadius: 10,
+      padding: 10,
+      fontFamily: "monospace",
+      marginVertical: 8,
+    },
+    code_block: {
+      backgroundColor: "#1E1E1E",
+      color: "#FFFFFF",
+      borderRadius: 10,
+      padding: 10,
+      fontFamily: "monospace",
+      marginVertical: 8,
+    },
+    code_inline: {
+      backgroundColor: "#333333",
+      color: "#FFFFFF",
+      borderRadius: 5,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      fontFamily: "monospace",
+    },
+    blockquote: {
+      backgroundColor: "rgba(255,255,255,0.2)",
+      borderLeftWidth: 4,
+      borderLeftColor: "#FFD700",
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 8,
+    },
+  }}
+>
+  {msg.message}
+</Markdown>
+
                 ) : (
-                  <Text style={styles.userText}>
-                    {msg.message}
-                  </Text>
+                  <Text style={styles.userText}>{msg.message}</Text>
                 )}
               </View>
             </View>
@@ -236,6 +262,7 @@ const FusionBot = ({ currentUser }) => {
           <TextInput
             style={styles.input}
             placeholder="Ask about Java..."
+            placeholderTextColor="#999"
             value={inputText}
             onChangeText={setInputText}
             editable={!loading && !!currentUser}

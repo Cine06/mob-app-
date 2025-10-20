@@ -1,12 +1,12 @@
-import { View, Text, TouchableOpacity, Image, Modal, TextInput, ScrollView } from "react-native";
+import { View, Text, TouchableOpacity, Image, Modal, TextInput, ScrollView, Alert } from "react-native";
 import { useState, useEffect } from "react";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { supabase } from "../utils/supabaseClient";
 import BottomNav from "../components/BottomNav";
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import styles from "../styles/profile";
+import * as SecureStore from "expo-secure-store";
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -24,8 +24,9 @@ export default function ProfileScreen() {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const user = JSON.parse(await AsyncStorage.getItem("user"));
-        if (user) {
+        const userJson = await SecureStore.getItemAsync("user");
+        if (userJson) {
+          const user = JSON.parse(userJson);
           const { data, error } = await supabase
             .from("users")
             .select(`id, school_id, first_name, middle_name, last_name, email, contact_number, 
@@ -61,16 +62,19 @@ export default function ProfileScreen() {
   }, []);
 
   const updateContactNumber = async () => {
-    const user = JSON.parse(await AsyncStorage.getItem("user"));
-    const { data, error } = await supabase
-      .from("users")
-      .update({ contact_number: contactNumber })
-      .eq("id", user.id);
+    const userJson = await SecureStore.getItemAsync("user");
+    if (userJson) {
+      const user = JSON.parse(userJson);
+      const { error } = await supabase
+        .from("users")
+        .update({ contact_number: contactNumber })
+        .eq("id", user.id);
 
-    if (error) {
-      console.error("Error updating contact number:", error.message);
-    } else {
-      alert("Contact number updated successfully");
+      if (error) {
+        console.error("Error updating contact number:", error.message);
+      } else {
+        alert("Contact number updated successfully");
+      }
     }
   };
 
@@ -86,17 +90,20 @@ export default function ProfileScreen() {
       const selectedImage = result.assets[0];
       const base64Image = await uriToBase64(selectedImage.uri);
       setProfilePic({ uri: selectedImage.uri });
+      
+      const userJson = await SecureStore.getItemAsync("user");
+      if (userJson) {
+        const user = JSON.parse(userJson);
+        const { error: updateError } = await supabase
+          .from("users")
+          .update({ profile_picture: base64Image })
+          .eq("id", user.id);
 
-      const user = JSON.parse(await AsyncStorage.getItem("user"));
-      const { updateError } = await supabase
-        .from("users")
-        .update({ profile_picture: base64Image })
-        .eq("id", user.id);
-
-      if (updateError) {
-        console.error(updateError.message);
-      } else {
-        await AsyncStorage.setItem("profile_picture", base64Image);
+        if (updateError) {
+          console.error(updateError.message);
+        } else {
+          // Note: Storing large base64 images in SecureStore might not be ideal.
+        }
       }
     }
   };
@@ -128,7 +135,20 @@ export default function ProfileScreen() {
           {[ 
             { title: "Information", action: () => setModalVisible(true) },
             { title: "Change Password", route: "/changepassword" },
-            { title: "Logout", route: "/login" },
+            { title: "Logout", action: () => {
+                Alert.alert("Logout", "Are you sure you want to logout?", [
+                  {
+                    text: "Cancel",
+                    style: "cancel",
+                  },
+                  { text: "OK", onPress: async () => {
+                      await SecureStore.deleteItemAsync("user");
+                      router.replace("/login");
+                    } 
+                  },
+                ]);
+              } 
+            },
           ].map((item, index) => (
             <TouchableOpacity
               key={index}

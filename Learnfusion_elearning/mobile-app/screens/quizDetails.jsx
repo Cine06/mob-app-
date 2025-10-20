@@ -1,114 +1,113 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, TextInput } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import BottomNav from '../components/BottomNav';
+import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../utils/supabaseClient';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
-function MatchingQuestionAnswer({ question, questionIndex, onAnswerChange, answers, isCompleted }) {
-  const prompts = question.matchingPairs.map((p, i) => ({
-    id: `prompt-${questionIndex}-${i}`,
-    content: p.left,
-  }));
+function MatchingQuestionAnswer({ question, questionIndex, onAnswerChange, answers, isCompleted, showCorrectAnswers }) {
+  const { matchingPairs } = question;
+  const prompts = matchingPairs.map(p => p.left);
+  const correctChoices = matchingPairs.map(p => p.right);
 
-  const initialChoices = question.matchingPairs.map((p, i) => ({
-    id: `choice-${questionIndex}-${i}-${p.right.replace(/\W/g, '')}`,
-    content: p.right,
-  }));
+  // `userAnswers` is an array of strings corresponding to the prompts
+  const userAnswers = answers[questionIndex] || Array(prompts.length).fill(null);
 
-  const [choicesInPool, setChoicesInPool] = useState(() => [...initialChoices]);
-  const [slots, setSlots] = useState(() => Array(prompts.length).fill(null));
+  // State for the currently selected choice from the pool
+  const [selectedChoice, setSelectedChoice] = useState(null);
 
-  const handleSlotChange = (slotIndex, choice) => {
+  useEffect(() => {
+    // When the question changes, reset the selected choice
+    setSelectedChoice(null);
+  }, [questionIndex]);
+
+  const handleSelectChoice = (choice) => {
     if (isCompleted) return;
-    
-    const newSlots = [...slots];
-    newSlots[slotIndex] = choice;
-    setSlots(newSlots);
-    
-    const newAnswers = newSlots.map(slot => slot ? slot.content : '');
+    // If the choice is already used in an answer slot, do nothing
+    if (userAnswers.includes(choice)) return;
+    // Select or deselect the choice
+    setSelectedChoice(prev => (prev === choice ? null : choice));
+  };
+
+  const handlePlaceAnswer = (slotIndex) => {
+    if (isCompleted || !selectedChoice) return;
+
+    const newAnswers = [...userAnswers];
+    // If the slot is already filled, clear it first
+    newAnswers[slotIndex] = selectedChoice;
+
+    onAnswerChange(questionIndex, newAnswers);
+    setSelectedChoice(null); // Deselect choice after placing it
+  };
+
+  const handleRemoveAnswer = (slotIndex) => {
+    if (isCompleted) return;
+
+    const newAnswers = [...userAnswers];
+    newAnswers[slotIndex] = null; // Clear the slot
     onAnswerChange(questionIndex, newAnswers);
   };
 
-  return (
-    <View style={{ marginBottom: 20 }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 20 }}>
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontWeight: 'bold', marginBottom: 10, color: '#046a38' }}>Prompts:</Text>
-          {prompts.map((prompt, promptIndex) => (
-            <View key={prompt.id} style={{ marginBottom: 15 }}>
-              <Text style={{ marginBottom: 5, fontSize: 14, color: '#333' }}>{prompt.content}</Text>
-              <View style={{
-                borderWidth: 2,
-                borderStyle: 'dashed',
-                borderColor: '#cccccc',
-                padding: 10,
-                minHeight: 44,
-                backgroundColor: slots[promptIndex] ? '#fffacd' : '#f9f9f9',
-                borderRadius: 4,
-                justifyContent: 'center',
-                opacity: isCompleted ? 0.7 : 1,
-              }}>
-                {slots[promptIndex] ? (
-                  <TouchableOpacity
-                    style={{
-                      padding: 8,
-                      borderWidth: 1,
-                      borderColor: '#cccccc',
-                      backgroundColor: 'white',
-                      borderRadius: 4,
-                    }}
-                    onPress={() => handleSlotChange(promptIndex, null)}
-                    disabled={isCompleted}
-                  >
-                    <Text>{slots[promptIndex].content}</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <Text style={{ color: '#aaaaaa', fontSize: 14 }}>Select answer</Text>
-                )}
-              </View>
-            </View>
-          ))}
-        </View>
+  // Choices that are not yet placed in an answer slot
+  const availableChoices = correctChoices.filter(choice => !userAnswers.includes(choice));
 
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontWeight: 'bold', marginBottom: 10, color: '#046a38' }}>Choices:</Text>
-          <View style={{
-            padding: 10,
-            borderWidth: 2,
-            borderStyle: 'dashed',
-            borderColor: '#cccccc',
-            minHeight: 120,
-            backgroundColor: '#f9f9f9',
-            borderRadius: 4,
-            gap: 8,
-            opacity: isCompleted ? 0.7 : 1,
-          }}>
-            {choicesInPool.map((choice, choiceIndex) => (
+  return (
+    <View style={styles.matchingContainer}>
+      {/* Prompts and Slots */}
+      <View style={styles.promptsContainer}>
+        <Text style={styles.matchingHeader}>Prompts</Text>
+        {prompts.map((prompt, index) => {
+          const userAnswer = userAnswers[index];
+          const isCorrect = showCorrectAnswers && userAnswer === correctChoices[index];
+          let slotStyle = [styles.answerSlot];
+
+          if (isCompleted && showCorrectAnswers) {
+            slotStyle.push(isCorrect ? styles.correctChoice : styles.incorrectChoice);
+          } else if (userAnswer) {
+            slotStyle.push(styles.filledSlot);
+          }
+
+          return (
+            <View key={index} style={styles.promptRow}>
+              <Text style={styles.promptText}>{prompt}</Text>
               <TouchableOpacity
-                key={choice.id}
-                style={{
-                  padding: 8,
-                  borderWidth: 1,
-                  borderColor: '#cccccc',
-                  backgroundColor: 'white',
-                  borderRadius: 4,
-                }}
-                onPress={() => {
-                  if (isCompleted) return;
-                  const emptySlotIndex = slots.findIndex(slot => !slot);
-                  if (emptySlotIndex !== -1) {
-                    handleSlotChange(emptySlotIndex, choice);
-                  }
-                }}
+                style={slotStyle}
+                onPress={() => userAnswer ? handleRemoveAnswer(index) : handlePlaceAnswer(index)}
                 disabled={isCompleted}
               >
-                <Text>{choice.content}</Text>
+                <Text style={styles.slotText}>{userAnswer || 'Tap to place'}</Text>
               </TouchableOpacity>
-            ))}
+            </View>
+          );
+        })}
+      </View>
+
+      {/* Choices Pool */}
+      {!isCompleted && (
+        <View style={styles.choicesPool}>
+          <Text style={styles.matchingHeader}>Choices</Text>
+          <View style={styles.choicesContainer}>
+            {correctChoices.map((choice, index) => {
+              const isUsed = userAnswers.includes(choice);
+              const isSelected = selectedChoice === choice;
+              return (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.choiceChip,
+                    isUsed && styles.usedChoice,
+                    isSelected && styles.selectedChoice,
+                  ]}
+                  onPress={() => handleSelectChoice(choice)}
+                  disabled={isUsed}
+                >
+                  <Text style={styles.choiceChipText}>{choice}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
-      </View>
+      )}
     </View>
   );
 }
@@ -135,44 +134,45 @@ const QuizDetails = () => {
       return;
     }
     
-    fetchQuizData();
-    getUserData();
+    const initialize = async () => {
+      const userData = await getUserData();
+      await fetchQuizData();
+      await checkQuizCompletion(userData);
+    };
+    initialize();
   }, [assessmentId, assignedAssessmentId]);
-
-  useEffect(() => {
-    if (quizData && assignedData) {
-      checkQuizCompletion();
-    }
-  }, [quizData, assignedData]);
 
   const getUserData = async () => {
     try {
-      const userData = await AsyncStorage.getItem('user');
+      const userData = await SecureStore.getItemAsync('user');
       if (userData) {
         setUser(JSON.parse(userData));
       }
+      return JSON.parse(userData);
     } catch (error) {
       console.error('Error getting user data:', error);
+      return null;
     }
   };
 
-  const checkQuizCompletion = async () => {
+  const checkQuizCompletion = async (currentUser) => {
     try {
-      if (!user || !user.id) return;
+      if (!currentUser || !currentUser.id || !assignedAssessmentId) return;
 
       const { data: takeData, error: takeError } = await supabase
         .from('student_assessments_take')
         .select('id')
-        .eq('assigned_assessments_id', assignedData.id)
+        .eq('assigned_assessments_id', assignedAssessmentId)
+        .eq('users_id', currentUser.id)
         .single();
 
-      if (takeError || !takeData) return;
-
+      if (takeError || !takeData) return; // No completion found, which is normal.
+      
       const { data: answerData, error: answerError } = await supabase
         .from('student_assessments_answer')
         .select('answer')
         .eq('student_assessments_take_id', takeData.id)
-        .eq('users_id', user.id);
+        .eq('users_id', currentUser.id);
 
       if (!answerError && answerData && answerData.length > 0) {
         setIsCompleted(true);
@@ -276,7 +276,8 @@ const QuizDetails = () => {
         .from('student_assessments_take')
         .insert({
           assigned_assessments_id: assignedData.id,
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
+          users_id: user.id
         })
         .select()
         .single();
@@ -295,7 +296,7 @@ const QuizDetails = () => {
             users_id: user.id,
             answer: JSON.stringify({
               questionIndex: parseInt(questionIndex),
-              answer: Array.isArray(answer) ? answer.join(', ') : answer
+              answer: answer // Save the answer as is (string or array)
             })
           });
       });
@@ -309,9 +310,20 @@ const QuizDetails = () => {
         return;
       }
 
-      Alert.alert('Success', 'Assessment submitted successfully!', [
-        { text: 'OK', onPress: () => router.push('/lessons') }
-      ]);
+      // Calculate score
+      const totalQuestions = questions.length;
+      const correctAnswersCount = questions.filter((question, index) => 
+        isAnswerCorrect(question, index, answers[index])
+      ).length;
+
+      // Update state to show completion UI
+      setIsCompleted(true);
+
+      Alert.alert(
+        "Submission Successful!",
+        `Your score: ${correctAnswersCount}/${totalQuestions}`,
+        [{ text: "Review Answers" }]
+      );
       
     } catch (error) {
       console.error('Error submitting quiz:', error);
@@ -370,9 +382,13 @@ const QuizDetails = () => {
     const correctAnswer = getCorrectAnswer(question, questionIndex);
     if (!correctAnswer || !userAnswer) return false;
     
-    if (question.activityType === 'Matching' && Array.isArray(userAnswer)) {
-      const userAnswerString = userAnswer.join(', ');
-      return userAnswerString.toLowerCase().trim() === correctAnswer.toLowerCase().trim();
+    if (question.activityType === 'Matching') {
+      if (!Array.isArray(userAnswer) || !question.matchingPairs) return false;
+      // Check if every user answer matches the correct pair's right side
+      return userAnswer.every((ans, index) => {
+        const correctPair = question.matchingPairs[index];
+        return correctPair && ans.toLowerCase().trim() === correctPair.right.toLowerCase().trim();
+      });
     }
     
     return userAnswer.toString().toLowerCase().trim() === correctAnswer.toLowerCase().trim();
@@ -508,22 +524,26 @@ const QuizDetails = () => {
 
   return (
     <>
-      <Stack.Screen 
-      style={{ marginTop: 100 }}
-        options={{ 
-          headerShown: true, 
-          title: quizData.title || 'Assessment',
-          headerStyle: { backgroundColor: '#046a38' },
-          headerTintColor: '#fff',
-          headerTitleAlign: 'center',
-        }} 
+      <Stack.Screen
+        options={{ headerShown: false }}
       />
       
-      <ScrollView style={{ flex: 1, backgroundColor: '#f5f5f5', padding: 20 }}>
+      <View style={styles.container}>
+        {/* Custom Header */}
+        <View style={styles.customHeader}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="white" />
+          </TouchableOpacity>
+          <Text style={styles.customHeaderText} numberOfLines={1}>
+            {quizData?.title || 'Assessment'}
+          </Text>
+        </View>
+
+      <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Quiz Header */}
-        <View style={{ backgroundColor: '#fff', padding: 20, borderRadius: 12, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, elevation: 4 }}>
+        <View style={styles.card}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 15 }}>
-            <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#046a38', flex: 1 }}>
+            <Text style={styles.title}>
               {quizData.title}
             </Text>
             {isCompleted && (
@@ -559,32 +579,19 @@ const QuizDetails = () => {
           </View>
           
           {isCompleted && (
-            <View style={{ 
-              backgroundColor: '#E8F5E8', 
-              padding: 15, 
-              borderRadius: 8, 
-              marginTop: 15,
-              borderLeftWidth: 4,
-              borderLeftColor: '#4CAF50'
-            }}>
-              <Text style={{ color: '#2E7D32', fontSize: 14, fontWeight: '600' }}>
+            <View style={styles.completedInfoBox}>
+              <Text style={styles.completedInfoTitle}>
                 Assessment Completed!
               </Text>
-              <Text style={{ color: '#4CAF50', fontSize: 12, marginTop: 5 }}>
+              <Text style={styles.completedInfoText}>
                 You have successfully submitted this assessment. Your answers are saved and cannot be modified.
               </Text>
               
               <TouchableOpacity
-                style={{
-                  backgroundColor: showCorrectAnswers ? '#4CAF50' : '#046a38',
-                  padding: 10,
-                  borderRadius: 6,
-                  marginTop: 10,
-                  alignItems: 'center',
-                }}
+                style={[styles.showAnswersButton, showCorrectAnswers && styles.showAnswersButtonActive]}
                 onPress={() => setShowCorrectAnswers(!showCorrectAnswers)}
               >
-                <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>
+                <Text style={styles.showAnswersButtonText}>
                   {showCorrectAnswers ? 'Hide Correct Answers' : 'Show Correct Answers'}
                 </Text>
               </TouchableOpacity>
@@ -594,7 +601,7 @@ const QuizDetails = () => {
 
         {/* Current Question */}
         {currentQuestion && (
-          <View style={{ backgroundColor: '#fff', padding: 20, borderRadius: 12, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, elevation: 4 }}>
+          <View style={styles.card}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 15 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
                 {isCompleted && showCorrectAnswers && (
@@ -664,7 +671,6 @@ const QuizDetails = () => {
                         borderRadius: 8,
                         marginBottom: 10,
                         backgroundColor: backgroundColor,
-                        opacity: isCompleted ?
                         opacity: isCompleted ? 0.7 : 1,
                       }}
                       onPress={() => handleAnswer(choice)}
@@ -686,64 +692,14 @@ const QuizDetails = () => {
                         )}
                       </View>
                       <Text style={{ fontSize: 16, color: '#333', flex: 1 }}>{choice}</Text>
-                      {isCompleted && showCorrectAnswers && isCorrectAnswer && (
-                        <Text style={{ color: '#4CAF50', fontSize: 14, fontWeight: 'bold', marginLeft: 10 }}>
-                          ✓
-                        </Text>
-                      )}
-                      {isCompleted && showCorrectAnswers && isUserAnswer && !isUserCorrect && (
-                        <Text style={{ color: '#D32F2F', fontSize: 14, fontWeight: 'bold', marginLeft: 10 }}>
-                          ✗
-                        </Text>
-                      )}
                     </TouchableOpacity>
                   );
                 })}
                 
-                {/* Show correct answer section for incorrect answers */}
                 {isCompleted && showCorrectAnswers && !isAnswerCorrect(currentQuestion, currentQuestionIndex, answers[currentQuestionIndex]) && (
-                  <View style={{
-                    marginTop: 15,
-                    padding: 15,
-                    backgroundColor: '#f9f9f9',
-                    borderRadius: 8,
-                    borderWidth: 1,
-                    borderColor: '#e0e0e0'
-                  }}>
-                    <Text style={{ 
-                      fontSize: 14, 
-                      fontWeight: '600', 
-                      color: '#333', 
-                      marginBottom: 10 
-                    }}>
-                      Correct answer
-                    </Text>
-                    <View style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      padding: 12,
-                      backgroundColor: '#fff',
-                      borderRadius: 6,
-                      borderWidth: 1,
-                      borderColor: '#4CAF50'
-                    }}>
-                      <View style={{
-                        width: 20,
-                        height: 20,
-                        borderRadius: 10,
-                        borderWidth: 2,
-                        borderColor: '#4CAF50',
-                        backgroundColor: '#4CAF50',
-                        marginRight: 15,
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                      }}>
-                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' }} />
-                      </View>
-                      <Text style={{ fontSize: 16, color: '#333', flex: 1 }}>
-                        {getCorrectAnswer(currentQuestion, currentQuestionIndex)}
-                      </Text>
-                    </View>
+                  <View style={styles.correctAnswerBox}>
+                    <Text style={styles.correctAnswerLabel}>Correct Answer:</Text>
+                    <Text style={styles.correctAnswerText}>{getCorrectAnswer(currentQuestion, currentQuestionIndex)}</Text>
                   </View>
                 )}
               </View>
@@ -799,91 +755,41 @@ const QuizDetails = () => {
                       }}>
                         {option}
                       </Text>
-                      {isCompleted && showCorrectAnswers && isCorrectAnswer && (
-                        <Text style={{ color: '#4CAF50', fontSize: 12, fontWeight: 'bold', marginTop: 5 }}>
-                          ✓
-                        </Text>
-                      )}
-                      {isCompleted && showCorrectAnswers && isUserAnswer && !isUserCorrect && (
-                        <Text style={{ color: '#D32F2F', fontSize: 12, fontWeight: 'bold', marginTop: 5 }}>
-                          ✗
-                        </Text>
-                      )}
                     </TouchableOpacity>
                   );
                 })}
-                
-                {/* Show correct answer section for incorrect answers */}
-                {isCompleted && showCorrectAnswers && !isAnswerCorrect(currentQuestion, currentQuestionIndex, answers[currentQuestionIndex]) && (
-                  <View style={{
-                    marginTop: 15,
-                    padding: 15,
-                    backgroundColor: '#f9f9f9',
-                    borderRadius: 8,
-                    borderWidth: 1,
-                    borderColor: '#e0e0e0'
-                  }}>
-                    <Text style={{ 
-                      fontSize: 14, 
-                      fontWeight: '600', 
-                      color: '#333', 
-                      marginBottom: 10 
-                    }}>
-                      Correct answer
-                    </Text>
-                    <View style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      padding: 12,
-                      backgroundColor: '#fff',
-                      borderRadius: 6,
-                      borderWidth: 1,
-                      borderColor: '#4CAF50'
-                    }}>
-                      <View style={{
-                        width: 20,
-                        height: 20,
-                        borderRadius: 10,
-                        borderWidth: 2,
-                        borderColor: '#4CAF50',
-                        backgroundColor: '#4CAF50',
-                        marginRight: 15,
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                      }}>
-                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' }} />
-                      </View>
-                      <Text style={{ fontSize: 16, color: '#333', flex: 1 }}>
-                        {getCorrectAnswer(currentQuestion, currentQuestionIndex)}
-                      </Text>
-                    </View>
-                  </View>
-                )}
               </View>
             )}
 
             {/* Short Answer / Fill in the Blanks */}
             {(currentQuestion.activityType === 'Short Answer' || currentQuestion.activityType === 'Fill in the Blanks') && (
-              <TextInput
-                style={{
-                  borderWidth: 1,
-                  borderColor: '#ddd',
-                  borderRadius: 8,
-                  padding: 15,
-                  fontSize: 16,
-                  backgroundColor: isCompleted ? '#f5f5f5' : '#fff',
-                  minHeight: 60,
-                  textAlignVertical: 'top',
-                  opacity: isCompleted ? 0.7 : 1,
-                  marginBottom: 20,
-                }}
-                placeholder={isCompleted ? 'Answer submitted' : `Enter your ${currentQuestion.activityType.toLowerCase()}...`}
-                value={answers[currentQuestionIndex] || ''}
-                onChangeText={(text) => !isCompleted && handleAnswer(text)}
-                multiline
-                numberOfLines={3}
-                editable={!isCompleted}
-              />
+              <>
+                <TextInput
+                  style={[
+                    styles.textInput,
+                    isCompleted && styles.disabledElement,
+                    isCompleted && showCorrectAnswers && (
+                      isAnswerCorrect(currentQuestion, currentQuestionIndex, answers[currentQuestionIndex])
+                        ? styles.correctChoice
+                        : styles.incorrectChoice
+                    )
+                  ]}
+                  placeholder={isCompleted ? 'Answer submitted' : `Enter your ${currentQuestion.activityType.toLowerCase()}...`}
+                  value={answers[currentQuestionIndex] || ''}
+                  onChangeText={(text) => handleAnswer(text)}
+                  multiline
+                  numberOfLines={3}
+                  editable={!isCompleted}
+                />
+                {isCompleted && showCorrectAnswers && !isAnswerCorrect(currentQuestion, currentQuestionIndex, answers[currentQuestionIndex]) && (
+                  <View style={styles.correctAnswerBox}>
+                    <Text style={styles.correctAnswerLabel}>Correct Answer:</Text>
+                    <Text style={styles.correctAnswerText}>
+                      {getCorrectAnswer(currentQuestion, currentQuestionIndex)}
+                    </Text>
+                  </View>
+                )}
+              </>
             )}
 
             {/* Matching */}
@@ -894,6 +800,7 @@ const QuizDetails = () => {
                 onAnswerChange={handleArrayAnswerChange}
                 answers={answers}
                 isCompleted={isCompleted}
+                showCorrectAnswers={showCorrectAnswers}
               />
             )}
           </View>
@@ -936,6 +843,45 @@ const QuizDetails = () => {
           </TouchableOpacity>
         </View>
 
+        {/* Assessment Results Summary */}
+        {isCompleted && showCorrectAnswers && (
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryTitle}>
+             Assessment Results Summary
+            </Text>
+            
+            {(() => {
+              const totalQuestions = questions.length;
+              const correctCount = questions.filter((question, index) => 
+                isAnswerCorrect(question, index, answers[index])
+              ).length;
+              const score = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
+              
+              return (
+                <>
+                  <View style={styles.summaryStat}>
+                    <Text style={styles.summaryLabel}>Total Questions:</Text>
+                    <Text style={styles.summaryValue}>{totalQuestions}</Text>
+                  </View>
+                  
+                  <View style={styles.summaryStat}>
+                    <Text style={styles.summaryLabel}>Correct Answers:</Text>
+                    <Text style={[styles.summaryValue, { color: '#4CAF50' }]}>{correctCount}</Text>
+                  </View>
+                  
+                  <View style={styles.summaryStat}>
+                    <Text style={styles.summaryLabel}>Incorrect Answers:</Text>
+                    <Text style={[styles.summaryValue, { color: '#D32F2F' }]}>{totalQuestions - correctCount}</Text>
+                  </View>
+                  
+                  <View style={styles.scoreContainer}>
+                    <Text style={styles.scoreText}>Score: {score}%</Text>
+                  </View>
+                </>
+              );
+            })()}
+          </View>
+        )}
         {/* Submit Button */}
         {deadlinePassed ? (
           <View style={{ 
@@ -969,7 +915,7 @@ const QuizDetails = () => {
           >
             <Text style={{ color: '#fff', fontSize: 18, fontWeight: '600' }}>
               {isCompleted 
-                ? '✓ Assessment Completed' 
+                ? '✓ Quiz Completed' 
                 : isSubmitting 
                   ? 'Submitting...' 
                   : 'Submit Assessment'
@@ -978,96 +924,67 @@ const QuizDetails = () => {
           </TouchableOpacity>
         )}
         
-        {isCompleted && (
-          <View style={{ 
-            backgroundColor: '#FFF3E0', 
-            padding: 15, 
-            borderRadius: 8, 
-            marginBottom: 20,
-            borderLeftWidth: 4,
-            borderLeftColor: '#FF9800'
-          }}>
-            <Text style={{ color: '#E65100', fontSize: 14, fontWeight: '600' }}>
-              Assessment Already Submitted
-            </Text>
-            <Text style={{ color: '#F57C00', fontSize: 12, marginTop: 5 }}>
-              You cannot submit this assessment again. If you need to make changes, please contact your instructor.
-            </Text>
-          </View>
-        )}
-
-        {/* Assessment Results Summary */}
-        {isCompleted && showCorrectAnswers && (
-          <View style={{ 
-            backgroundColor: '#F3E5F5', 
-            padding: 20, 
-            borderRadius: 12, 
-            marginBottom: 20,
-            borderLeftWidth: 4,
-            borderLeftColor: '#9C27B0'
-          }}>
-            <Text style={{ color: '#7B1FA2', fontSize: 18, fontWeight: 'bold', marginBottom: 15, textAlign: 'center' }}>
-             Assessment Results Summary
-            </Text>
-            
-            {(() => {
-              const totalQuestions = questions.length;
-              const correctAnswers = questions.filter((question, index) => 
-                isAnswerCorrect(question, index, answers[index])
-              ).length;
-              const percentage = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
-              
-              return (
-                <View>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
-                    <Text style={{ color: '#4A148C', fontSize: 16, fontWeight: '600' }}>Total Questions:</Text>
-                    <Text style={{ color: '#4A148C', fontSize: 16, fontWeight: '600' }}>{totalQuestions}</Text>
-                  </View>
-                  
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
-                    <Text style={{ color: '#4CAF50', fontSize: 16, fontWeight: '600' }}>Correct Answers:</Text>
-                    <Text style={{ color: '#4CAF50', fontSize: 16, fontWeight: '600' }}>{correctAnswers}</Text>
-                  </View>
-                  
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 }}>
-                    <Text style={{ color: '#D32F2F', fontSize: 16, fontWeight: '600' }}>Incorrect Answers:</Text>
-                    <Text style={{ color: '#D32F2F', fontSize: 16, fontWeight: '600' }}>{totalQuestions - correctAnswers}</Text>
-                  </View>
-                  
-                  <View style={{ 
-                    backgroundColor: percentage >= 70 ? '#E8F5E8' : percentage >= 50 ? '#FFF3E0' : '#FFEBEE',
-                    padding: 15,
-                    borderRadius: 8,
-                    borderLeftWidth: 4,
-                    borderLeftColor: percentage >= 70 ? '#4CAF50' : percentage >= 50 ? '#FF9800' : '#D32F2F'
-                  }}>
-                    <Text style={{ 
-                      color: percentage >= 70 ? '#2E7D32' : percentage >= 50 ? '#E65100' : '#C62828',
-                      fontSize: 18,
-                      fontWeight: 'bold',
-                      textAlign: 'center'
-                    }}>
-                      Score: {percentage}%
-                    </Text>
-                    <Text style={{ 
-                      color: percentage >= 70 ? '#4CAF50' : percentage >= 50 ? '#F57C00' : '#D32F2F',
-                      fontSize: 14,
-                      textAlign: 'center',
-                      marginTop: 5
-                    }}>
-                      {percentage >= 70 ? 'Excellent!' : percentage >= 50 ? 'Good job!' : 'Keep studying!'}
-                    </Text>
-                  </View>
-                </View>
-              );
-            })()}
-          </View>
-        )}
-        
       </ScrollView>
+      </View>
     </>
   );
 };
-
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#f5f5f5', paddingTop: 35 },
+  customHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#046a38',
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+  },
+  backButton: {
+    paddingRight: 15,
+  },
+  customHeaderText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  scrollContent: { paddingHorizontal: 15, paddingBottom: 40, marginTop: 25 },
+  card: { backgroundColor: '#fff', padding: 20, borderRadius: 12, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, elevation: 4 },
+  summaryCard: { backgroundColor: '#F3E5F5', padding: 20, borderRadius: 12, marginBottom: 20, borderLeftWidth: 4, borderLeftColor: '#9C27B0' },
+  summaryTitle: { color: '#7B1FA2', fontSize: 18, fontWeight: 'bold', marginBottom: 15, textAlign: 'center' },
+  summaryStat: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+  summaryLabel: { fontSize: 16, color: '#4A148C' },
+  summaryValue: { fontSize: 16, fontWeight: '600', color: '#4A148C' },
+  scoreContainer: { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#CE93D8' },
+  scoreText: { fontSize: 20, fontWeight: 'bold', textAlign: 'center', color: '#7B1FA2' },
+  completedInfoBox: { backgroundColor: '#E8F5E8', padding: 15, borderRadius: 8, marginTop: 15, borderLeftWidth: 4, borderLeftColor: '#4CAF50', marginBottom: 10 },
+  completedInfoTitle: { color: '#2E7D32', fontSize: 14, fontWeight: '600' },
+  completedInfoText: { color: '#4CAF50', fontSize: 12, marginTop: 5 },
+  showAnswersButton: { backgroundColor: '#046a38', padding: 10, borderRadius: 6, marginTop: 10, alignItems: 'center' },
+  showAnswersButtonActive: { backgroundColor: '#4CAF50' },
+  showAnswersButtonText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  textInput: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 15, fontSize: 16, backgroundColor: '#fff', minHeight: 60, textAlignVertical: 'top', marginBottom: 20 },
+  disabledElement: { opacity: 0.7 },
+  correctChoice: { backgroundColor: '#E8F5E8', borderColor: '#4CAF50', borderWidth: 2 },
+  incorrectChoice: { backgroundColor: '#FFEBEE', borderColor: '#D32F2F', borderWidth: 2 },
+  correctAnswerBox: { marginTop: 10, padding: 10, backgroundColor: '#f0f9ff', borderRadius: 6, borderWidth: 1, borderColor: '#b3e5fc', marginBottom: 20 },
+  correctAnswerLabel: { fontSize: 14, fontWeight: '600', color: '#0277bd' },
+  correctAnswerText: { fontSize: 14, color: '#01579b', marginTop: 4 },
+  // Matching Type Styles
+  matchingContainer: { marginBottom: 20 },
+  promptsContainer: { marginBottom: 20 },
+  matchingHeader: { fontSize: 16, fontWeight: '600', color: '#046a38', marginBottom: 10 },
+  promptRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  promptText: { flex: 1, fontSize: 15, color: '#333' },
+  answerSlot: { flex: 1, borderWidth: 2, borderStyle: 'dashed', borderColor: '#ccc', borderRadius: 8, padding: 12, alignItems: 'center', justifyContent: 'center', minHeight: 48 },
+  filledSlot: { borderColor: '#046a38', backgroundColor: '#f0f9ff' },
+  slotText: { fontSize: 15, color: '#666' },
+  choicesPool: { marginTop: 10, borderTopWidth: 1, borderTopColor: '#eee', paddingTop: 15 },
+  choicesContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  choiceChip: { backgroundColor: '#fff', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 20, borderWidth: 1, borderColor: '#046a38' },
+  choiceChipText: { color: '#046a38', fontWeight: '500' },
+  selectedChoice: { backgroundColor: '#046a38', borderColor: '#023c1e' },
+  usedChoice: { backgroundColor: '#e0e0e0', borderColor: '#bdbdbd', opacity: 0.6 },
+  // End Matching Type Styles
+  title: { fontSize: 24, fontWeight: 'bold', color: '#046a38', flex: 1 ,paddingTop:5,},
+});
 
 export default QuizDetails;

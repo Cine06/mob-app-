@@ -6,13 +6,28 @@ export default StyleSheet.create({
       backgroundColor: "#FFF",
       padding: 15,
     },
+    headerContainer: {
+      marginTop: 25
+    },
+    defaultHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 10,
+      marginBottom: 10,
+      width: '100%'
+    },
+    selectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      width: '100%',
+    },
     header: {
-      marginTop: 25,
       fontSize: 22,
       fontWeight: "bold",
-      marginBottom: 5,
-      textAlign: "center",
-      
     },
     noNotifications: {
       textAlign: "center",

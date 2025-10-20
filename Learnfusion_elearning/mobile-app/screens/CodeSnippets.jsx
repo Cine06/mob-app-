@@ -8,16 +8,28 @@ import {
   ScrollView,
   Alert,
   KeyboardAvoidingView,
-  Platform
+  Platform,
+  ActivityIndicator,
 } from "react-native";
 import { FontAwesome5 } from "@expo/vector-icons";
 import BottomNav from "../components/BottomNav";
 import { Stack } from "expo-router";
 import FloatingChatbot from "../components/FloatingChatbot";
-import { JDOODLE_CLIENT_ID, JDOODLE_CLIENT_SECRET, JDOODLE_RUN_URL } from '@env';
+import Constants from "expo-constants";
 import styles from "../styles/code";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 
 const DEBUG = true;
+
+const {
+  JDOODLE_CLIENT_ID,
+  JDOODLE_CLIENT_SECRET,
+  JDOODLE_RUN_URL,
+} = Constants.expoConfig?.extra || {};
+console.log("JDoodle ENV:", { JDOODLE_CLIENT_ID, JDOODLE_RUN_URL });
 
 export default function CodeSnippets() {
   const [selectedTab, setSelectedTab] = useState("code");
@@ -25,8 +37,10 @@ export default function CodeSnippets() {
   const [output, setOutput] = useState("Output will be displayed here");
   const [isRunning, setIsRunning] = useState(false);
   const [stdin, setStdin] = useState("");
+  const [isDownloading, setIsDownloading] = useState(false);
   const [completedTopics, setCompletedTopics] = useState(new Set());
   const [activeTopic, setActiveTopic] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
   const outputScrollRef = useRef(null);
   const showInputPanel = code.includes("Scanner");
 
@@ -40,6 +54,61 @@ export default function CodeSnippets() {
     }
   };
 
+  // Fetch the current user from SecureStore when the component mounts
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const userStr = await SecureStore.getItemAsync("user");
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          setCurrentUser(user);
+          log("User loaded for checklist", user);
+        }
+      } catch (error) {
+        log("Failed to load user from secure store", error);
+      }
+    };
+    fetchUser();
+  }, []);
+
+  // Load user-specific completed topics from AsyncStorage once the user is identified
+  useEffect(() => {
+    const loadCompletedTopics = async () => {
+      try {        const storageKey = `completed_topics_${currentUser.id}`;
+        const savedTopics = await AsyncStorage.getItem(storageKey);
+        if (savedTopics !== null) {
+          const topicsArray = JSON.parse(savedTopics);
+          setCompletedTopics(new Set(topicsArray));
+          log("Loaded completed topics from storage", topicsArray);
+        }
+      } catch (error) {
+        log("Failed to load completed topics from storage", error);
+      }
+    };
+
+    if (currentUser) {
+      loadCompletedTopics();
+    }
+  }, [currentUser]); // This effect runs when the currentUser state is updated
+
+  // Save user-specific completed topics to AsyncStorage whenever they change
+  useEffect(() => {
+    const saveCompletedTopics = async () => {
+      if (!currentUser) return; // Don't save if there's no user
+
+      try {
+        const storageKey = `completed_topics_${currentUser.id}`;
+        const topicsArray = Array.from(completedTopics);
+        await AsyncStorage.setItem(storageKey, JSON.stringify(topicsArray));
+        log(`Saved ${topicsArray.length} completed topics for user ${currentUser.id}`);
+      } catch (error) {
+        log("Failed to save completed topics to storage", error);
+      }
+    };
+
+    saveCompletedTopics();
+  }, [completedTopics]);
+  
    const javaTopics = {
     "Java Basics": [
       "Run HelloWorld program",
@@ -463,6 +532,41 @@ public class AddNumbers {
     ]);
   };
 
+  const downloadCode = async () => {
+    if (!code.trim()) {
+      Alert.alert("No Code", "There is no code to download.");
+      return;
+    }
+
+    setIsDownloading(true);
+    let fileName = "MyCode.java";
+    // Try to find the class name to use as the filename
+    const match = code.match(/public class (\w+)/);
+    if (match && match[1]) {
+      fileName = `${match[1]}.java`;
+    }
+
+    try {
+      const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
+      await FileSystem.writeAsStringAsync(fileUri, code, {
+        encoding: 'utf8',
+      });
+
+      log(`Code saved to ${fileUri}`);
+
+      if (!(await Sharing.isAvailableAsync())) {
+        Alert.alert("Sharing not available", "Sharing is not available on your platform.");
+        return;
+      }
+
+      await Sharing.shareAsync(fileUri);
+    } catch (error) {
+      log("Error downloading code", error);
+      Alert.alert("Error", "Could not download the file.");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
   const testConnection = async () => {
     setIsRunning(true);
     setOutput("Testing JDoodle connection...");
@@ -501,6 +605,14 @@ public class AddNumbers {
             <TouchableOpacity style={styles.addButton} onPress={clearCode}>
               <FontAwesome5 name="trash" size={16} color="white" />
             </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.addButton, { marginLeft: 5 }]}
+              onPress={downloadCode}
+              disabled={isDownloading}
+            >
+              {isDownloading ? <ActivityIndicator size="small" color="white" /> : <FontAwesome5 name="download" size={16} color="white" />}
+            </TouchableOpacity>
+
             <TouchableOpacity
               style={[styles.runButton, { marginLeft: 5, paddingHorizontal: 15 }]}
               onPress={() => runCode()}

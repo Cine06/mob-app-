@@ -1,17 +1,23 @@
 import { useEffect } from "react";
 import { useRouter } from "expo-router";
 import { View, Text } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 
 export default function Index() {
   const router = useRouter();
 
   useEffect(() => {
     const checkAuth = async () => {
-      const user = await AsyncStorage.getItem("user");
-      if (user) {
-        router.replace("/dashboard");
-      } else {
+      try {
+        const userData = await SecureStore.getItemAsync("user");
+
+        if (userData) {
+          router.replace("/dashboard");
+        } else {
+          router.replace("/login");
+        }
+      } catch (error) {
+        console.error("Error reading user data:", error);
         router.replace("/login");
       }
     };
