@@ -29,7 +29,6 @@ const {
   JDOODLE_CLIENT_SECRET,
   JDOODLE_RUN_URL,
 } = Constants.expoConfig?.extra || {};
-console.log("JDoodle ENV:", { JDOODLE_CLIENT_ID, JDOODLE_RUN_URL });
 
 export default function CodeSnippets() {
   const [selectedTab, setSelectedTab] = useState("code");
@@ -44,15 +43,7 @@ export default function CodeSnippets() {
   const outputScrollRef = useRef(null);
   const showInputPanel = code.includes("Scanner");
 
-  const log = (msg, data = null) => {
-    if (!DEBUG) return;
-    const timestamp = new Date().toISOString();
-    if (data !== null) {
-      console.log(`[CodeSnippets ${timestamp}] ${msg}`, data);
-    } else {
-      console.log(`[CodeSnippets ${timestamp}] ${msg}`);
-    }
-  };
+  
 
   // Fetch the current user from SecureStore when the component mounts
   useEffect(() => {

@@ -258,8 +258,8 @@ const QuizDetails = () => {
     const unansweredQuestions = questions.filter((_, index) => {
       const answer = answers[index];
       if (!answer) return true;
-      if (Array.isArray(answer)) {
-        return answer.some(a => !a || a.trim() === '');
+      if (Array.isArray(answer)) { // For matching questions
+        return answer.some(a => !a || (typeof a === 'string' && a.trim() === ''));
       }
       return answer.toString().trim() === '';
     });
@@ -617,15 +617,6 @@ const QuizDetails = () => {
                   Question {currentQuestionIndex + 1} of {questions.length} ({currentQuestion.activityType})
                 </Text>
               </View>
-              {isCompleted && showCorrectAnswers && (
-                <Text style={{ 
-                  fontSize: 16, 
-                  fontWeight: 'bold',
-                  color: isAnswerCorrect(currentQuestion, currentQuestionIndex, answers[currentQuestionIndex]) ? '#4CAF50' : '#D32F2F'
-                }}>
-                  {isAnswerCorrect(currentQuestion, currentQuestionIndex, answers[currentQuestionIndex]) ? '1/1' : '0/1'}
-                </Text>
-              )}
             </View>
             
             <Text style={{ fontSize: 16, color: '#333', marginBottom: 20, lineHeight: 24 }}>

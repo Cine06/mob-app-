@@ -310,13 +310,20 @@ export default function AssignmentDetails() {
     const questions = parseQuestions();
     const unansweredQuestions = questions.filter((_, index) => {
       const answer = answers[index];
-      if (!answer) return true;
-      if (Array.isArray(answer)) return answer.some(a => !a || a.trim() === '');
-      return answer.toString().trim() === '';
+      const question = questions[index]; // Get the actual question object
+
+      if (question.activityType === 'File Submission') {
+        // For file submission, an answer is valid if there's at least one file uploaded
+        return !answer || !Array.isArray(answer) || answer.length === 0;
+      } else {
+        if (!answer) return true;
+        if (Array.isArray(answer)) return answer.some(a => !a || (typeof a === 'string' && a.trim() === ''));
+        return answer.toString().trim() === '';
+      }
     });
 
     if (unansweredQuestions.length > 0) {
-      Alert.alert('Incomplete', 'Please answer all questions before submitting.');
+      Alert.alert('Incomplete', 'Please provide an answer for all parts of the assignment before submitting.');
       return;
     }
 
@@ -376,58 +383,83 @@ export default function AssignmentDetails() {
   };
 
   const handleFilePick = async () => {
-  if (isCompleted) return;
-
-  try {
-    const result = await DocumentPicker.getDocumentAsync({
-      type: ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/x-java-source', 'text/plain'],
-      copyToCacheDirectory: true,
-    });
-
-    if (result.canceled) return;
-
-    const file = result.assets[0];
-    const allowedTypes = ['.pdf', '.docx', '.java'];
-    const fileExtension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
-
-    if (!allowedTypes.includes(fileExtension)) {
-      Alert.alert('Invalid File Type', 'Only .pdf, .docx, or .java allowed.');
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      Alert.alert('File Too Large', 'Max 5MB.');
-      return;
-    }
-
-    setIsUploading(true);
-
-    // ✅ Generate unique file name
-    const uniqueFileName = `${user.id}/${Date.now()}-${file.name}`;
-
-    // ✅ Read and upload
-    const base64 = await FileSystem.readAsStringAsync(file.uri, { encoding: 'base64' });
-    const fileData = decode(base64);
-
-    const { data, error } = await supabase.storage
-      .from('assignment-submissions')
-      .upload(uniqueFileName, fileData, {
-        contentType: file.mimeType,
-        upsert: true,
+    if (isCompleted) return;
+  
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: [
+          'application/pdf', 
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 
+          'text/x-java-source',
+          '*/*' // Fallback to allow any file type to be selected
+        ],
+        copyToCacheDirectory: true,
+        multiple: true, // Allow multiple files to be selected
       });
+  
+      if (result.canceled) return;
+  
+      const files = result.assets;
+      const allowedTypes = ['.pdf', '.docx', '.java'];
+      const MAX_SIZE_MB = 250;
+  
+      const currentFiles = answers[currentQuestionIndex] || [];
+      let newFilesToUpload = [];
+  
+      for (const file of files) {
+        const fileExtension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+  
+        if (!allowedTypes.includes(fileExtension)) {
+          Alert.alert('Invalid File Type', `File "${file.name}" has an unsupported type. Only .pdf, .docx, or .java are allowed.`);
+          continue; // Skip this file
+        }
+  
+        if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+          Alert.alert('File Too Large', `File "${file.name}" exceeds the ${MAX_SIZE_MB}MB limit.`);
+          continue; // Skip this file
+        }
+  
+        newFilesToUpload.push(file);
+      }
+  
+      if (newFilesToUpload.length === 0) return;
+  
+      setIsUploading(true);
+  
+      const uploadPromises = newFilesToUpload.map(async (file) => {
+        const uniqueFileName = `${user.id}/${Date.now()}-${file.name}`;
+        const base64 = await FileSystem.readAsStringAsync(file.uri, { encoding: 'base64' });
+        const fileData = decode(base64);
+  
+        const { data, error } = await supabase.storage
+          .from('assignment-submissions')
+          .upload(uniqueFileName, fileData, {
+            contentType: file.mimeType,
+            upsert: true,
+          });
+  
+        if (error) throw error;
+        return { path: data.path, name: file.name };
+      });
+  
+      const uploadedFiles = await Promise.all(uploadPromises);
+      
+      // Append new files to existing ones
+      handleAnswerChange([...currentFiles, ...uploadedFiles]);
+  
+      Alert.alert('Success', `${uploadedFiles.length} file(s) uploaded successfully.`);
+    } catch (error) {
+      console.error('Upload error:', error);
+      Alert.alert('Upload Error', 'Failed to upload one or more files.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
-    if (error) throw error;
-
-    handleAnswerChange({ path: data.path, name: file.name });
-
-    Alert.alert('Success', `File "${file.name}" uploaded successfully.`);
-  } catch (error) {
-    console.error('Upload error:', error);
-    Alert.alert('Upload Error', 'Failed to upload file.');
-  } finally {
-    setIsUploading(false);
-  }
-};
+  const handleRemoveFile = (fileToRemove) => {
+    const updatedFiles = (answers[currentQuestionIndex] || []).filter(file => file.path !== fileToRemove.path);
+    handleAnswerChange(updatedFiles);
+  };
 
 
   const handleViewSubmittedFile = async (fileAnswer) => {
@@ -577,12 +609,14 @@ export default function AssignmentDetails() {
         {/* Questions */}
         {currentQuestion && (
           <View style={styles.card}>
-            <View style={styles.questionHeaderContainer}>
-              {isCompleted && showCorrectAnswers && currentQuestion.activityType !== 'File Submission' && (
-                 <Text style={[styles.feedbackIcon, isAnswerCorrect(currentQuestion, currentQuestionIndex, answers[currentQuestionIndex]) ? styles.correctIcon : styles.incorrectIcon]}>
-                   {isAnswerCorrect(currentQuestion, currentQuestionIndex, answers[currentQuestionIndex]) ? '✓' : '✗'}
-                 </Text>
-              )}
+            <View style={styles.questionHeaderContainer}>              
+                {isCompleted && showCorrectAnswers && currentQuestion.activityType !== 'File Submission' && (
+                    <Text style={[styles.feedbackIcon, isAnswerCorrect(currentQuestion, currentQuestionIndex, answers[currentQuestionIndex]) ? styles.correctIcon : styles.incorrectIcon]}>
+                        {isAnswerCorrect(currentQuestion, currentQuestionIndex, answers[currentQuestionIndex]) ? '✓' : '✗'}
+                    </Text>
+                )}
+
+
               <Text style={styles.questionHeader}>
                 Question {currentQuestionIndex + 1} of {questions.length} ({currentQuestion.activityType})
               </Text>
@@ -738,73 +772,81 @@ export default function AssignmentDetails() {
                 <View>
                   {isCompleted ? (
                     <View>
-                      <TouchableOpacity 
-                        style={styles.fileSubmissionContainer}
-                        onPress={() => handleViewSubmittedFile(answers[currentQuestionIndex])}
-                      >
-                        <MaterialCommunityIcons name="file-check" size={24} color="#4CAF50" />
-                        <Text style={styles.fileSubmissionText} numberOfLines={1}>
-                          Submitted: {answers[currentQuestionIndex]?.name || 'File record not found.'}
-                        </Text>
-                        <MaterialCommunityIcons name="eye-outline" size={24} color="#2E7D32" style={{ marginLeft: 'auto' }} />
-                      </TouchableOpacity>
                       {submissionScore !== null ? (
                         <View style={styles.gradeBox}>
-                          <Text style={styles.gradeLabel}>Grade:</Text>
-                          <Text style={styles.gradeValue}>{submissionScore}</Text>
+                          <Text style={styles.gradeLabel}>Final Grade: {submissionScore} / {currentQuestion.maxScore || 'N/A'}</Text>
                         </View>
                       ) : (
                         <View style={styles.waitingGradeBox}>
                           <Text style={styles.waitingGradeText}>Waiting for grading</Text>
                         </View>
                       )}
+                      {(answers[currentQuestionIndex] || []).map((file, index) => (
+                        <TouchableOpacity 
+                          key={index}
+                          style={styles.fileSubmissionContainer}
+                          onPress={() => handleViewSubmittedFile(file)}
+                        >
+                          <MaterialCommunityIcons name="file-check" size={24} color="#4CAF50" />
+                          <Text style={styles.fileSubmissionText} numberOfLines={1}>
+                            {file.name}
+                          </Text>
+                          <MaterialCommunityIcons name="eye-outline" size={24} color="#2E7D32" style={{ marginLeft: 'auto' }} />
+                        </TouchableOpacity>
+                      ))}
                     </View>
                   ) : (
                     <>
-                      {answers[currentQuestionIndex]?.path ? (
-                        <View style={styles.fileSubmissionContainer}>
-                          <MaterialCommunityIcons name="file-check" size={24} color="#4CAF50" />
-                          <Text style={styles.fileSubmissionText}>
-                            Uploaded: {answers[currentQuestionIndex]?.name}
+                      {(answers[currentQuestionIndex] || []).map((file, index) => (
+                        <View key={index} style={styles.fileSubmissionContainer}>
+                          <MaterialCommunityIcons name="file-document-outline" size={24} color="#046a38" />
+                          <Text style={[styles.fileSubmissionText, {color: '#046a38'}]} numberOfLines={1}>
+                            {file.name}
                           </Text>
+                          <TouchableOpacity onPress={() => handleRemoveFile(file)} style={{ marginLeft: 'auto', padding: 5 }}>
+                            <MaterialCommunityIcons name="close-circle" size={24} color="#D32F2F" />
+                          </TouchableOpacity>
                         </View>
-                      ) : (
+                      ))}
+                      {/* The upload button should always be visible if not completed, to allow adding more files */}
                         <TouchableOpacity style={styles.uploadButton} onPress={handleFilePick} disabled={isUploading}>
                           <MaterialCommunityIcons name="upload" size={22} color="#fff" />
                           <Text style={styles.uploadButtonText}>{isUploading ? 'Uploading...' : 'Upload File'}</Text>
                         </TouchableOpacity>
-                      )}
-                      <Text style={styles.uploadHint}>Allowed files: .java, .docx, .pdf (Max 5MB)</Text>
+                      
+                      <Text style={styles.uploadHint}>Allowed files: .java, .docx, .pdf (Max 250MB)</Text>
                     </>
-                  )}
+                  )} 
                 </View>
                 </>
               )}
           </View>
         )}
 
-        {/* Navigation */}
-        <View style={styles.navigationContainer}>
-          <TouchableOpacity 
-            onPress={goToPreviousQuestion} 
-            disabled={currentQuestionIndex === 0}
-            style={[styles.navButton, currentQuestionIndex === 0 && styles.disabledNavButton]}
-          >
-            <Text style={styles.navButtonText}>Previous</Text>
-          </TouchableOpacity>
-          
-          <Text style={styles.navText}>
-            {currentQuestionIndex + 1} / {questions.length}
-          </Text>
-          
-          <TouchableOpacity
-            onPress={goToNextQuestion}
-            disabled={currentQuestionIndex === questions.length - 1}
-            style={[styles.navButton, currentQuestionIndex === questions.length - 1 && styles.disabledNavButton]}
-          >
-            <Text style={styles.navButtonText}>Next</Text>
-          </TouchableOpacity>
-        </View>
+        {/* Navigation - Only show if not a File Submission */}
+        {currentQuestion && currentQuestion.activityType !== 'File Submission' && (
+          <View style={styles.navigationContainer}>
+            <TouchableOpacity 
+              onPress={goToPreviousQuestion} 
+              disabled={currentQuestionIndex === 0}
+              style={[styles.navButton, currentQuestionIndex === 0 && styles.disabledNavButton]}
+            >
+              <Text style={styles.navButtonText}>Previous</Text>
+            </TouchableOpacity>
+            
+            <Text style={styles.navText}>
+              {currentQuestionIndex + 1} / {questions.length}
+            </Text>
+            
+            <TouchableOpacity
+              onPress={goToNextQuestion}
+              disabled={currentQuestionIndex === questions.length - 1}
+              style={[styles.navButton, currentQuestionIndex === questions.length - 1 && styles.disabledNavButton]}
+            >
+              <Text style={styles.navButtonText}>Next</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {isCompleted && (
           <View style={styles.summaryCard}>
@@ -813,6 +855,15 @@ export default function AssignmentDetails() {
               const autoGradableQuestions = questions.filter(q => q.activityType !== 'File Submission');
               const totalAutoGradable = autoGradableQuestions.length;
               const correctCount = autoGradableQuestions.filter((q, i) => isAnswerCorrect(q, i, answers[i])).length;
+
+              let totalPossibleScore = 'N/A';
+              if (questions.length > 0) {
+                if (questions[0].activityType === 'File Submission' && questions[0].maxScore !== undefined) {
+                  totalPossibleScore = questions[0].maxScore;
+                } else {
+                  totalPossibleScore = questions.length; // Default to 1 point per question for auto-graded
+                }
+              }
 
               return (
                 <>
@@ -827,7 +878,7 @@ export default function AssignmentDetails() {
                   
                   {submissionScore !== null ? (
                     <View style={styles.scoreContainer}>
-                      <Text style={styles.scoreText}>Final Grade: {submissionScore}</Text>
+                      <Text style={styles.scoreText}>Final Grade: {submissionScore} / {totalPossibleScore}</Text>
                     </View>
                   ) : (
                      <View style={styles.waitingGradeBoxSummary}>
@@ -969,7 +1020,7 @@ const styles = StyleSheet.create({
   uploadButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#046a38', padding: 15, borderRadius: 8, marginTop: 10 },
   uploadButtonText: { color: '#fff', fontSize: 16, fontWeight: '600', marginLeft: 10 },
   uploadHint: { fontSize: 12, color: '#666', textAlign: 'center', marginTop: 8 },
-  fileSubmissionContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#E8F5E8', padding: 15, borderRadius: 8, marginTop: 10 },
+  fileSubmissionContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#E8F5E8', padding: 15, borderRadius: 8, marginTop: 10, borderWidth: 1, borderColor: '#ddd' },
   fileSubmissionText: { fontSize: 14, color: '#2E7D32', marginLeft: 10, flex: 1 },
   viewPdfButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#D32F2F', padding: 12, borderRadius: 8, marginBottom: 15 },
   viewPdfButtonText: { color: '#fff', fontSize: 15, fontWeight: '600', marginLeft: 10 },

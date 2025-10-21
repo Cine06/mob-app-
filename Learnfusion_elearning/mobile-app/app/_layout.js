@@ -1,5 +1,6 @@
 import { Stack } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { CardStyleInterpolators } from "@react-navigation/stack";
 import { ErrorBoundary } from "react-error-boundary";
 import { View, Text, Button, StyleSheet } from "react-native";
 
@@ -20,6 +21,11 @@ export default function Layout() {
         <Stack
           screenOptions={{
             headerShown: false,
+            gestureEnabled: false, // Disable gestures for a more controlled feel
+            animationEnabled: true,
+            animation: "fade",
+            cardStyleInterpolator: CardStyleInterpolators.forFadeFromBottomAndroid,
+            animationDuration: 250, // Fast and smooth
           }}
         />
       </GestureHandlerRootView>

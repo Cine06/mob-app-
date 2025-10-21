@@ -94,7 +94,7 @@ export default function Dashboard() {
 
       const { data: allAnswersData, error: answersError } = await supabase
         .from("student_assessments_answer")
-        .select("users_id, answer, student_assessments_take:student_assessments_take_id(assigned_assessments_id)")
+        .select("users_id, answer, student_assessments_take:student_assessments_take_id(assigned_assessments_id, score)")
         .in("student_assessments_take.assigned_assessments_id", assignedAssessmentIds);
       if (answersError) throw answersError;
 
@@ -102,55 +102,94 @@ export default function Dashboard() {
       const allAnswers = allAnswersData || [];
 
       const totalPossiblePoints = assignedAssessments.reduce((sum, a) => {
-        const questions = a.assessment?.questions;
-        return sum + (Array.isArray(questions) ? questions.length : 0);
+        const questions = Array.isArray(a.assessment?.questions) ? a.assessment.questions : [];
+        return sum + questions.length;
       }, 0);
 
-      if (totalPossiblePoints === 0) {
-        setLeaderboardData([]);
-        setCurrentUserRankInfo(null);
-        setLoadingLeaderboard(false);
-        return;
-      }
-
       const studentScores = students.map((student) => {
-        let totalScore = 0;
+        const quizPercentages = [];
+        const assignmentPercentages = [];
         const studentAnswers = allAnswers.filter((ans) => ans.users_id === student.id);
 
         assignedAssessments.forEach((assigned) => {
           const assessment = assigned.assessment;
-          if (assessment && assessment.questions && Array.isArray(assessment.questions)) {
-            const answersForThisAssessment = studentAnswers.filter(
-              (ans) => ans.student_assessments_take.assigned_assessments_id === assigned.id
+          const questions = Array.isArray(assessment?.questions) ? assessment.questions : [];
+          
+          if (assessment.type === 'Assignment' && questions[0]?.activityType === 'File Submission') {
+            const take = studentAnswers.find(ans => ans.student_assessments_take.assigned_assessments_id === assigned.id)?.student_assessments_take;
+            const score = take?.score ?? 0;
+            const maxScore = questions[0]?.maxScore || 50; // Default maxScore for file submission
+            const percentage = maxScore > 0 ? (score / maxScore) * 100 : 0;
+            assignmentPercentages.push(percentage);
+          } else if (questions.length > 0) {
+            let correctCount = 0;
+            const answersForThisAssessment = studentAnswers.filter(ans => ans.student_assessments_take.assigned_assessments_id === assigned.id);
+
+            const studentAnswersMap = new Map(
+                answersForThisAssessment.map(a => {
+                    try {
+                        const parsed = JSON.parse(a.answer);
+                        const studentAnswerValue = parsed.answer?.answer ?? parsed.answer;
+                        return [parsed.questionIndex, studentAnswerValue];
+                    } catch (e) {
+                        return [null, null];
+                    }
+                }).filter(item => item[0] !== null)
             );
 
+            questions.forEach((question, index) => {
+                const studentAnswer = studentAnswersMap.get(index);
+                let correctAnswer = question.correctAnswer;
+
+                if (question.activityType === 'Matching' && Array.isArray(question.matchingPairs)) {
+                    correctAnswer = question.matchingPairs.map(p => p.right);
+                }
+
+                if (studentAnswer !== undefined && correctAnswer !== undefined) {
+                    if (Array.isArray(studentAnswer) && Array.isArray(correctAnswer)) {
+                        if (JSON.stringify(studentAnswer.sort()) === JSON.stringify(correctAnswer.sort())) {
+                            correctCount++;
+                        }
+                    } else if (String(studentAnswer).toLowerCase() === String(correctAnswer).toLowerCase()) {
+                        correctCount++;
+                    }
+                }
+            });
+
+            // Original simplified logic (removed):
+            /*
             answersForThisAssessment.forEach((answer, answerIndex) => {
               try {
                 const answerData = JSON.parse(answer.answer);
                 const questionIndex = answerData.questionIndex;
                 const studentAnswer = answerData.answer;
-
-                if (
-                  questionIndex !== undefined &&
-                  assessment.questions[questionIndex]?.correctAnswer === studentAnswer
-                ) {
-                  totalScore++;
+                if (questionIndex !== undefined && questions[questionIndex]?.correctAnswer === studentAnswer) {
+                  correctCount++;
                 }
               } catch (e) {
-                if (assessment.questions[answerIndex]?.correctAnswer === answer.answer) {
-                  totalScore++;
+                if (questions[answerIndex]?.correctAnswer === answer.answer) {
+                  correctCount++;
                 }
               }
             });
+            */
+
+            const percentage = (correctCount / questions.length) * 100;
+            if (assessment.type === 'Quiz') {
+              quizPercentages.push(percentage);
+            } else if (assessment.type === 'Assignment') {
+              assignmentPercentages.push(percentage);
+            }
           }
         });
 
-        const percentage =
-          totalPossiblePoints > 0 ? (totalScore / totalPossiblePoints) * 100 : 0;
+        const quizAverage = quizPercentages.length > 0 ? quizPercentages.reduce((a, b) => a + b, 0) / quizPercentages.length : 0;
+        const assignmentAverage = assignmentPercentages.length > 0 ? assignmentPercentages.reduce((a, b) => a + b, 0) / assignmentPercentages.length : 0;
+        const finalGrade = (quizAverage * 0.4) + (assignmentAverage * 0.6);
         return {
           user_id: student.id,
           name: `${student.first_name} ${student.last_name}`.trim(),
-          percentage: isNaN(percentage) ? 0 : percentage,
+          percentage: isNaN(finalGrade) ? 0 : finalGrade,
         };
       });
 

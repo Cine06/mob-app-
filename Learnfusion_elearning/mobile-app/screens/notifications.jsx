@@ -66,13 +66,16 @@ export default function Notifications() {
       const formatted = data.map((item) => {
         const notif = item.notifications;
         const isMessageType = notif?.type === "message";
+        const isGradedAssignmentType = notif?.type === "graded_assignment";
         return {
           id: notif?.id,
           userNotifId: item.id,
           title: notif?.title,
           message: isMessageType
             ? "You have a new message"
-            : notif?.description || notif?.title,
+            : isGradedAssignmentType
+              ? `${notif?.title} - have been graded`
+              : notif?.description || notif?.title,
           type: notif?.type,
           eventDate: notif?.event_date,
           route: notif?.route,
@@ -166,13 +169,16 @@ export default function Notifications() {
 
             if (notifData) {
               const isMessageType = notifData.type === "message";
+              const isGradedAssignmentType = notifData.type === "graded_assignment";
               const newNotif = {
                 id: notifData.id,
                 userNotifId: payload.new.id,
                 title: notifData.title,
                 message: isMessageType
                   ? "You have a new message"
-                  : notifData.description || notifData.title,
+                  : isGradedAssignmentType
+                    ? `${notifData.title} - have been graded`
+                    : notifData.description || notifData.title,
                 type: notifData.type,
                 eventDate: notifData.event_date,
                 route: notifData.route,
@@ -331,6 +337,8 @@ export default function Notifications() {
               ? "question-circle"
               : item.type === "handout"
               ? "file-alt"
+              : item.type === "graded_assignment"
+              ? "clipboard-check" // Using a clipboard-check icon for graded assignments
               : "bell"
           }
           size={20}

@@ -7,10 +7,11 @@ import {
   Image,
   Alert,
   KeyboardAvoidingView,
+  ActivityIndicator,
   Platform,
   ScrollView,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, Stack } from "expo-router";
 import { supabase } from "../utils/supabaseClient";
 import Icon from "react-native-vector-icons/Feather";
 import bcrypt from "react-native-bcrypt";
@@ -25,9 +26,11 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    try {
+    setLoading(true);
+    try {      
       const { data: user, error } = await supabase
         .from("users")
         .select("*")
@@ -57,10 +60,16 @@ export default function LoginScreen() {
       router.push("/dashboard");
     } catch (err) {
       Alert.alert("Login Failed", err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
+    <>
+    <Stack.Screen
+        options={{ headerShown: false }}
+      />
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -100,11 +109,16 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-            <Text style={styles.loginButtonText}>LOGIN</Text>
+          <TouchableOpacity style={styles.loginButton} onPress={handleLogin} disabled={loading}>
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.loginButtonText}>LOGIN</Text>
+            )}
           </TouchableOpacity>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
+    </>
   );
 }
