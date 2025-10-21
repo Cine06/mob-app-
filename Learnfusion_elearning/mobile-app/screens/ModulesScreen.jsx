@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, ScrollView, Image, Linking, Modal, Animated, KeyboardAvoidingView, Platform } from "react-native";
+import { View, Text, TouchableOpacity, ScrollView, Image, Linking, Modal, Animated, KeyboardAvoidingView, Platform, FlatList } from "react-native";
 import { useState, useEffect, useRef } from "react";
 import { useRouter, Stack, useLocalSearchParams } from "expo-router";
 import BottomNav from "../components/BottomNav";
@@ -502,9 +502,10 @@ export default function ELearningModules() {
             behavior={Platform.OS === "ios" ? "padding" : "height"}
             keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
           >
-            <ScrollView style={[styles.mainContent, { flexGrow: 1 }]} contentContainerStyle={{ paddingBottom: 80 }} keyboardShouldPersistTaps="handled">
+            <View style={[styles.mainContent, { flex: 1 }]}>
               {activeTab === "lessons" && (
-                <>
+                <ScrollView contentContainerStyle={{ paddingBottom: 80 }} keyboardShouldPersistTaps="handled">
+
                 <Text style={styles.title}>LESSONS</Text>
 
                 {/* Show message if no handouts available */}
@@ -645,115 +646,102 @@ export default function ELearningModules() {
                   })}
                 </View>
                 </>}
-                </>
+                </ScrollView>
               )}
 
               {activeTab === "assignments" && (
                 <>
                 <Text style={styles.title}>ASSIGNMENTS</Text>
-                  {assignments.length > 0 ? (
-                    <View style={styles.listContainer}>
-                      {assignments.map((assignment, index) => (
-                        <TouchableOpacity
-                          key={index}
-                          style={styles.assignmentItem}
-                          onPress={() => {
-                            router.push({
-                              pathname: "/assignmentDetails",
-                              params: {
-                                assessmentId: assignment.assessment.id,
-                                assignedAssessmentId: assignment.id,
-                              }
-                            });
-                          }}
-                        >
-                          <View style={styles.assignmentContent}>
-                            <Text style={styles.assignmentTitle}>{assignment.assessment.title || 'Untitled Assignment'}</Text>
-                            <Text style={styles.assignmentDescription}>
-                              {assignment.assessment.description || 'No description available'}
+                  <FlatList
+                    data={assignments}
+                    contentContainerStyle={{ paddingBottom: 80 }}
+                    keyExtractor={(item) => item.id.toString()}
+                    renderItem={({ item }) => (
+                      <TouchableOpacity
+                        style={styles.assignmentItem}
+                        onPress={() => {
+                          router.push({
+                            pathname: "/assignmentDetails",
+                            params: {
+                              assessmentId: item.assessment.id,
+                              assignedAssessmentId: item.id,
+                            }
+                          });
+                        }}
+                      >
+                        <View style={styles.assignmentContent}>
+                          <Text style={styles.assignmentTitle}>{item.assessment.title || 'Untitled Assignment'}</Text>
+                          <Text style={styles.assignmentDescription}>
+                            {item.assessment.description || 'No description available'}
+                          </Text>
+                          <View style={styles.assignmentMeta}>
+                            <Text style={styles.assignmentDeadline}>
+                              Deadline: {item.deadline ? new Date(item.deadline).toLocaleDateString() : 'No deadline'}
                             </Text>
-                            <View style={styles.assignmentMeta}>
-                              <Text style={styles.assignmentDeadline}>
-                                Deadline: {assignment.deadline ? new Date(assignment.deadline).toLocaleDateString() : 'No deadline'}
-                              </Text>
-                            </View>
                           </View>
-                          <Icon name="chevron-right" size={24} color="#046a38" />
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  ) : (
-                    <View style={styles.noAssignments}>
-                      <Icon name="clipboard-check-outline" size={48} color="#ccc" />
-                      <Text style={[styles.noAssignmentsText, { marginTop: 16 }]}>You're all caught up!
+                        </View>
+                        <Icon name="chevron-right" size={24} color="#046a38" />
+                      </TouchableOpacity>
+                    )}
+                    ListEmptyComponent={() => (
+                      <View style={styles.noAssignments}>
+                        <Icon name="clipboard-check-outline" size={48} color="#ccc" />
+                        <Text style={[styles.noAssignmentsText, { marginTop: 16 }]}>You're all caught up!
 No assignments are currently available for your section.</Text>
-                    </View>
-                  )}
+                      </View>
+                    )}
+                  />
               </>
               )}
 
               {activeTab === "quizzes" && (
                 <>
                 <Text style={styles.title}>QUIZZES</Text>
-                  {quizzes.length > 0 ? (
-                    <View style={styles.listContainer}>
-                      {quizzes.map((quiz, index) => {
-                        let questionCount = 0;
-                        if (quiz.assessment?.questions) {
-                          try {
-                            const questions = typeof quiz.assessment.questions === 'string'
-                              ? JSON.parse(quiz.assessment.questions)
-                              : quiz.assessment.questions;
-                            questionCount = questions ? questions.length : 0;
-                          } catch (e) {
-                            console.error(`Error parsing questions for rendering:`, e);
-                            questionCount = 0;
-                          }
-                        }
-
-                        return (
-                          <TouchableOpacity
-                            key={index}
-                            style={styles.quizItem}
-                            onPress={() => {
-                              router.push({
-                                pathname: "/quizDetails",
-                                params: {
-                                  assessmentId: quiz.assessment.id,
-                                  assignedAssessmentId: quiz.id
-                                }
-                              });
-                            }}
-                          >
-                            <View style={styles.quizContent}>
-                              <Text style={styles.quizTitle}>{quiz.assessment.title || 'Untitled Quiz'}</Text>
-                              <Text style={styles.quizDescription}>
-                                {quiz.assessment.description || 'No description available'}
-                              </Text>
-                              <View style={styles.quizMeta}>
-                                <Text style={styles.quizDeadline}>
-                                  Deadline: {quiz.deadline ? new Date(quiz.deadline).toLocaleDateString() : 'No deadline'}
-                                </Text>
-                                <Text style={styles.quizType}>
-                                  {quiz.assessment.questionCount || 0} questions
-                                </Text>
-                              </View>
-                            </View>
-                            <Icon name="chevron-right" size={24} color="#046a38" />
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  ) : (
-                    <View style={styles.noQuizzes}>
-                      <Icon name="trophy-outline" size={48} color="#ccc" />
-                      <Text style={[styles.noQuizzesText, { marginTop: 16 }]}>No quizzes are available right now.
+                  <FlatList
+                    data={quizzes}
+                    contentContainerStyle={{ paddingBottom: 80 }}
+                    keyExtractor={(item) => item.id.toString()}
+                    renderItem={({ item: quiz }) => (
+                      <TouchableOpacity
+                        style={styles.quizItem}
+                        onPress={() => {
+                          router.push({
+                            pathname: "/quizDetails",
+                            params: {
+                              assessmentId: quiz.assessment.id,
+                              assignedAssessmentId: quiz.id
+                            }
+                          });
+                        }}
+                      >
+                        <View style={styles.quizContent}>
+                          <Text style={styles.quizTitle}>{quiz.assessment.title || 'Untitled Quiz'}</Text>
+                          <Text style={styles.quizDescription}>
+                            {quiz.assessment.description || 'No description available'}
+                          </Text>
+                          <View style={styles.quizMeta}>
+                            <Text style={styles.quizDeadline}>
+                              Deadline: {quiz.deadline ? new Date(quiz.deadline).toLocaleDateString() : 'No deadline'}
+                            </Text>
+                            <Text style={styles.quizType}>
+                              {quiz.assessment.questionCount || 0} questions
+                            </Text>
+                          </View>
+                        </View>
+                        <Icon name="chevron-right" size={24} color="#046a38" />
+                      </TouchableOpacity>
+                    )}
+                    ListEmptyComponent={() => (
+                      <View style={styles.noQuizzes}>
+                        <Icon name="trophy-outline" size={48} color="#ccc" />
+                        <Text style={[styles.noQuizzesText, { marginTop: 16 }]}>No quizzes are available right now.
 Check back later!</Text>
-                    </View>
-                  )}
+                      </View>
+                    )}
+                  />
                 </>
               )}
-            </ScrollView>
+            </View>
 
             {activeTab === "lessons" && lessonHandouts.length > 0 && (
               <View style={[styles.lessonNavigation, { paddingBottom: 75,paddingTop: 5, borderTopWidth: 1, borderTopColor: '#e9ecef' }]}>

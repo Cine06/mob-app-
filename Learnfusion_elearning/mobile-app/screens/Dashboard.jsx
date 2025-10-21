@@ -320,8 +320,6 @@ export default function Dashboard() {
         return item.title;
     }
   };
-  console.log("Supabase URL:", process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL);
-  // console.log("Supabase URL:", process.env.EXPO_PUBLIC_SUPABASE_URL);
 
 
   return (

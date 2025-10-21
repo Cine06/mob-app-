@@ -5,8 +5,11 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { supabase } from '../utils/supabaseClient';
 import * as FileSystem from "expo-file-system/legacy";
 import * as SecureStore from 'expo-secure-store';
-import * as DocumentPicker from 'expo-document-picker';
+import * as DocumentPicker from "expo-document-picker";
 import DocumentModal from '../components/DocumentModal';
+import { decode } from "base64-arraybuffer";
+import * as WebBrowser from "expo-web-browser";
+
 
 
 function MatchingQuestionAnswer({ question, questionIndex, onAnswerChange, answers, isCompleted, showCorrectAnswers }) {
@@ -133,7 +136,7 @@ export default function AssignmentDetails() {
   const [documentViewerVisible, setDocumentViewerVisible] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [submissionScore, setSubmissionScore] = useState(null);
-  const [viewingDocument, setViewingDocument] = useState(null);
+  const [viewingDocument, setViewingDocument] = useState(null); // For instructions/lessons
 
   useEffect(() => {
     if (!assessmentId || !assignedAssessmentId) {
@@ -373,100 +376,83 @@ export default function AssignmentDetails() {
   };
 
   const handleFilePick = async () => {
-    if (isCompleted) return;
+  if (isCompleted) return;
 
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/x-java-source', 'text/plain'],
-        copyToCacheDirectory: true,
+  try {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/x-java-source', 'text/plain'],
+      copyToCacheDirectory: true,
+    });
+
+    if (result.canceled) return;
+
+    const file = result.assets[0];
+    const allowedTypes = ['.pdf', '.docx', '.java'];
+    const fileExtension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+
+    if (!allowedTypes.includes(fileExtension)) {
+      Alert.alert('Invalid File Type', 'Only .pdf, .docx, or .java allowed.');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      Alert.alert('File Too Large', 'Max 5MB.');
+      return;
+    }
+
+    setIsUploading(true);
+
+    // ✅ Generate unique file name
+    const uniqueFileName = `${user.id}/${Date.now()}-${file.name}`;
+
+    // ✅ Read and upload
+    const base64 = await FileSystem.readAsStringAsync(file.uri, { encoding: 'base64' });
+    const fileData = decode(base64);
+
+    const { data, error } = await supabase.storage
+      .from('assignment-submissions')
+      .upload(uniqueFileName, fileData, {
+        contentType: file.mimeType,
+        upsert: true,
       });
 
-      if (result.canceled === false) {
-        const file = result.assets[0];
-        // Validate file type again as DocumentPicker can be broad
-        const allowedTypes = ['.pdf', '.docx', '.java'];
-        const fileExtension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+    if (error) throw error;
 
-        if (!allowedTypes.includes(fileExtension)) {
-          Alert.alert('Invalid File Type', `Please select a .pdf, .docx, or .java file. You selected a ${fileExtension} file.`);
-          return;
-        }
+    handleAnswerChange({ path: data.path, name: file.name });
 
-        if (file.size > 5 * 1024 * 1024) { // 5MB limit
-          Alert.alert('File Too Large', 'Please select a file smaller than 5MB.');
-          return;
-        }
+    Alert.alert('Success', `File "${file.name}" uploaded successfully.`);
+  } catch (error) {
+    console.error('Upload error:', error);
+    Alert.alert('Upload Error', 'Failed to upload file.');
+  } finally {
+    setIsUploading(false);
+  }
+};
 
-        setIsUploading(true);
-        // get mime type from extension
-        const ext = file.name.split('.').pop();
-        const contentType = file.mimeType;
-
-        // Read file as base64 for upload
-        const base64 = await FileSystem.readAsStringAsync(file.uri, { encoding: 'base64' });
-
-        const fileName = `${user.id}/${assignedAssessmentId}-${Date.now()}.${ext}`;
-        const { data, error } = await supabase.storage
-          .from('assignment-submissions')
-          .upload(fileName, base64, {
-            contentType,
-            upsert: false,
-            encoding: 'base64'
-          });
-
-        if (error) throw error;
-
-        handleAnswerChange({ path: data.path, name: file.name });
-        Alert.alert('Success', `File "${file.name}" uploaded successfully.`);
-      }
-    } catch (error) {
-      console.error('Error picking or uploading file:', error);
-      Alert.alert('Upload Error', 'Failed to upload the file. Please try again.');
-    } finally {
-      setIsUploading(false);
-    }
-  };
 
   const handleViewSubmittedFile = async (fileAnswer) => {
-    if (!fileAnswer?.path) {
-      Alert.alert('Error', 'File path not found. Cannot view the file.');
-      return;
-    }
+  if (!fileAnswer?.path) {
+    Alert.alert('Error', 'File path not found.');
+    return;
+  }
 
-    // Validate file type before attempting to view
-    const allowedExtensions = ['.java', '.pdf', '.docx'];
-    const fileName = fileAnswer.name || '';
-    const fileExtension = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
+  try {
+    const { data, error } = await supabase.storage
+      .from('assignment-submissions')
+      .createSignedUrl(fileAnswer.path, 300);
 
-    if (!allowedExtensions.includes(fileExtension)) {
-      Alert.alert('Unsupported File Type', `Viewing for "${fileExtension}" files is not supported in the app.`);
-      return;
-    }
+    if (error) throw error;
 
-    // This function now downloads the file and opens it in the modal
-    try {
-      const { data: urlData, error: urlError } = await supabase.storage
-        .from('assignment-submissions')
-        .createSignedUrl(fileAnswer.path, 60); // URL is valid for 60 seconds
+    const signedUrl = data.signedUrl;
 
-      if (urlError) throw urlError;
-      
-      // Download the file to a local cache directory
-      const fileUri = FileSystem.cacheDirectory + fileAnswer.name;
-      const { uri } = await FileSystem.downloadAsync(urlData.signedUrl, fileUri);
+    await WebBrowser.openBrowserAsync(signedUrl);
+  } catch (error) {
+    console.error('Error opening submitted file:', error);
+    Alert.alert('Error', 'Could not open the file.');
+  }
+};
 
-      // Open the local file in the document modal
-      setViewingDocument({
-        url: uri, // Use the local file URI
-        title: fileAnswer.name || 'Submitted File',
-      });
-      setDocumentViewerVisible(true);
 
-    } catch (error) {
-      console.error('Error downloading or viewing file:', error);
-      Alert.alert('Error', 'Could not open the submitted file. Please try again.');
-    }
-  };
 
   const parseQuestions = () => {
     if (!assignmentData?.questions) return [];
@@ -736,8 +722,12 @@ export default function AssignmentDetails() {
                 {currentQuestion.instructionFileUrl && (
                   <TouchableOpacity
                     style={styles.viewPdfButton}
-                    onPress={() => {
-                      setViewingDocument({ url: currentQuestion.instructionFileUrl, title: 'Instructions' });
+                    onPress={() => { // Disable speech for instructions
+                      setViewingDocument({
+                        url: currentQuestion.instructionFileUrl,
+                        title: 'Instructions',
+                        showSpeechControls: false,
+                      });
                       setDocumentViewerVisible(true);
                     }}
                   >
@@ -880,7 +870,7 @@ export default function AssignmentDetails() {
         </Modal>
       </View>
 
-      {/* Document Viewer Modal for instructions and submitted files */}
+      {/* Document Viewer Modal for instructions */}
       <DocumentModal
         visible={documentViewerVisible}
         document={viewingDocument}

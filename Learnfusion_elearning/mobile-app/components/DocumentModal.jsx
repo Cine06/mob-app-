@@ -51,33 +51,18 @@ export default function DocumentModal({ visible, document, onClose, showSpeechCo
       setIsTextFile(false);
       setTextContent(null);
       setPages([]);
+      setWebViewLoading(true); // Reset webview loading state
 
       const videoId = getYouTubeVideoId(document?.url);
-      const isJavaFile = document?.url.toLowerCase().includes('.java');
 
       if (videoId) {
         setIsYouTubeVideo(true);
-      } else if (isJavaFile) {
-        setIsTextFile(true);
-        // If it's a local file, read it directly. Otherwise, fetch it.
-        if (document.url.startsWith('file://')) {
-          FileSystem.readAsStringAsync(document.url)
-            .then(setTextContent)
-            .catch(err => {
-              console.error("Failed to read local file content:", err);
-              setTextContent("Error: Could not read local file.");
-            });
-        } else {
-          axios.get(document.url, { transformResponse: [(data) => data] })
-            .then(response => setTextContent(response.data))
-            .catch(err => {
-              console.error("Failed to fetch remote text content:", err);
-              setTextContent("Error: Could not load file content.");
-            });
-        }
       } else {
-        // Only extract text if speech controls are needed
-        if (showSpeechControls) {
+        setIsTextFile(false); // Ensure this is reset
+        setTextContent(null);
+
+        // Only extract text for speech if speech controls are shown AND it's not a YouTube video.
+        if (showSpeechControls && !videoId) {
           loadOrExtract(document);
         } else {
           setPages([]); // Ensure pages are cleared if not extracting
@@ -85,7 +70,7 @@ export default function DocumentModal({ visible, document, onClose, showSpeechCo
       }
     }
     return () => stopSpeech();
-  }, [visible, document?.url, showSpeechControls]);
+  }, [visible, document?.url, document?.title, showSpeechControls]); // Added document.title to dependencies
 
   /** 🔹 Ensure cache folder **/
   const ensureCacheDir = async () => {
@@ -322,9 +307,20 @@ export default function DocumentModal({ visible, document, onClose, showSpeechCo
                         </body>
                       </html>`,
                   }
-                : document?.url.startsWith('file://')
-                ? { uri: document.url }
-                : { uri: `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(document?.url)}` }
+                : (() => {
+                    const fileUrl = document?.url;
+                    if (!fileUrl) return null;
+
+                    const fileName = document?.title || fileUrl;
+                    const fileExtension = fileName.split('.').pop()?.toLowerCase();
+
+                    if (fileExtension === 'pdf') {
+                        return { uri: fileUrl }; // Direct PDF rendering
+                    } else if (fileExtension === 'docx' || fileExtension === 'doc') {
+                        return { uri: `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(fileUrl)}` };
+                    }
+                    return { uri: `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(fileUrl)}` }; // Fallback to Google Docs Viewer for other types
+                })()
             }
             allowsFullscreenVideo
             onLoadStart={() => setWebViewLoading(true)}

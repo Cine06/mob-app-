@@ -55,11 +55,9 @@ export default ({ config }) => ({
     typedRoutes: true,
   },
 
-  // Bare workflow requires a static runtime version for EAS Update.
   runtimeVersion: "1.0.0",
 
   updates: {
-    // This tells Expo where to get your OTA updates
     url: "https://u.expo.dev/6779663d-c717-420a-b54d-38916a16b7a1",
     enabled: true,
     checkAutomatically: "ON_LOAD",
@@ -69,7 +67,6 @@ export default ({ config }) => ({
   extra: {
     eas: {
       projectId: "6779663d-c717-420a-b54d-38916a16b7a1",
-      // 👇 Channel is important for OTA updates
       channel: process.env.EAS_CHANNEL || "production",
     },
     EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL,
