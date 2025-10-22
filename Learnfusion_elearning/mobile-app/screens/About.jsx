@@ -4,6 +4,7 @@ import { View, Text, Image, TouchableOpacity, ScrollView, Alert } from "react-na
 import { useRouter, Stack } from "expo-router";
 import { FontAwesome5 } from "@expo/vector-icons";
 import BottomNav from "../components/BottomNav";
+import * as SecureStore from "expo-secure-store";
 import styles from "../styles/about";
 
 export default function About() {
@@ -23,7 +24,11 @@ export default function About() {
       },
       {
         text: "OK",
-        onPress: () => navigateTo("/login"),
+        onPress: async () => {
+          // Securely log out by deleting user data and replacing the route
+          await SecureStore.deleteItemAsync("user");
+          router.replace("/login");
+        },
       },
     ]);
   };
