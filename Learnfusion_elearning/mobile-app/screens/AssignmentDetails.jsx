@@ -357,6 +357,23 @@ export default function AssignmentDetails() {
 
       if (hasAnswerError) throw new Error('Failed to save one or more answers.');
 
+      // For file submissions, also create an entry in the 'submissions' table.
+      // This is used by the TeacherDashboard for "Waiting for grade" notifications.
+      const { error: submissionInsertError } = await supabase
+        .from('submissions')
+        .insert({
+          student_id: user.id,
+          section_id: assignedData.section_id,
+          assessment_id: assignedData.assessment_id, // This is the ID from the 'assessments' table
+          submitted_at: new Date().toISOString(),
+          status: 'Pending', // Default status for awaiting grade
+        });
+
+      if (submissionInsertError) {
+        console.error('Error inserting into submissions table:', submissionInsertError);
+        throw submissionInsertError; // Re-throw to indicate submission failure
+      }
+
       // Check if there are any auto-gradable questions
       const autoGradableQuestions = questions.filter(q => q.activityType !== 'File Submission');
       let message = "Your submission has been received and is waiting for grading.";

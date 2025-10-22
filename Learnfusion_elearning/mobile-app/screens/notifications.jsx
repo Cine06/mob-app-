@@ -63,25 +63,50 @@ export default function Notifications() {
 
       if (error) throw error;
 
-      const formatted = data.map((item) => {
-        const notif = item.notifications;
-        const isMessageType = notif?.type === "message";
-        const isGradedAssignmentType = notif?.type === "graded_assignment";
-        return {
-          id: notif?.id,
-          userNotifId: item.id,
-          title: notif?.title,
-          message: isMessageType
-            ? "You have a new message"
-            : isGradedAssignmentType
+      const formatted = await Promise.all(
+        data.map(async (item) => {
+          const notif = item.notifications;
+          const isMessageType = notif?.type === "message";
+          const isGradedAssignmentType = notif?.type === "graded_assignment";
+
+          let finalRoute = notif?.route;
+          // If it's a message, fetch sender's info to populate route params
+          if (isMessageType && notif.route?.params?.receiverId) {
+            const senderId = notif.route.params.receiverId; // In this context, receiverId is the sender
+            const { data: senderData, error: senderError } = await supabase
+              .from("users")
+              .select("first_name, last_name, profile_picture")
+              .eq("id", senderId)
+              .single();
+
+            if (!senderError && senderData) {
+              finalRoute = {
+                ...notif.route,
+                params: {
+                  ...notif.route.params,
+                  name: `${senderData.first_name} ${senderData.last_name}`.trim(),
+                  avatar: senderData.profile_picture,
+                },
+              };
+            }
+          }
+
+          return {
+            id: notif?.id,
+            userNotifId: item.id,
+            title: notif?.title,
+            message: isMessageType
+              ? "You have a new message"
+              : isGradedAssignmentType
               ? `${notif?.title} - have been graded`
               : notif?.description || notif?.title,
-          type: notif?.type,
-          eventDate: notif?.event_date,
-          route: notif?.route,
-          isRead: !!item.read_at,
-        };
-      });
+            type: notif?.type,
+            eventDate: notif?.event_date,
+            route: finalRoute,
+            isRead: !!item.read_at,
+          };
+        })
+      );
 
       setNotifications(formatted);
     } catch (err) {
@@ -170,6 +195,29 @@ export default function Notifications() {
             if (notifData) {
               const isMessageType = notifData.type === "message";
               const isGradedAssignmentType = notifData.type === "graded_assignment";
+
+              let finalRoute = notifData.route;
+              // If it's a message, fetch sender's info to populate route params
+              if (isMessageType && notifData.route?.params?.receiverId) {
+                const senderId = notifData.route.params.receiverId;
+                const { data: senderData, error: senderError } = await supabase
+                  .from("users")
+                  .select("first_name, last_name, profile_picture")
+                  .eq("id", senderId)
+                  .single();
+
+                if (!senderError && senderData) {
+                  finalRoute = {
+                    ...notifData.route,
+                    params: {
+                      ...notifData.route.params,
+                      name: `${senderData.first_name} ${senderData.last_name}`.trim(),
+                      avatar: senderData.profile_picture,
+                    },
+                  };
+                }
+              }
+
               const newNotif = {
                 id: notifData.id,
                 userNotifId: payload.new.id,
@@ -181,7 +229,7 @@ export default function Notifications() {
                     : notifData.description || notifData.title,
                 type: notifData.type,
                 eventDate: notifData.event_date,
-                route: notifData.route,
+                route: finalRoute,
                 isRead: false,
               };
               setNotifications((prev) => [newNotif, ...prev]);

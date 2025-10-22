@@ -230,6 +230,7 @@ export default function Dashboard() {
 
   useFocusEffect(
     useCallback(() => {
+
       let sectionId = null;
 
       const setup = async () => {
@@ -250,6 +251,7 @@ export default function Dashboard() {
             sectionId = userData.section_id;
             fetchReminders(sectionId);
             fetchLeaderboard(sectionId, parsedUser.id);
+
           } else {
             fetchReminders(null);
             fetchLeaderboard(null, parsedUser.id);
@@ -266,23 +268,20 @@ export default function Dashboard() {
         .channel("public:reminders")
         .on(
           "postgres_changes",
-          { event: "*", schema: "public", table: "assigned_assessments" },
+          { event: "*", schema: "public", table: "assigned_assessments", filter: `section_id=eq.${sectionId}` },
           (payload) => {
-            if (sectionId && payload.new.section_id === sectionId) {
-              fetchReminders(sectionId);
-            }
+            fetchReminders(sectionId);
           }
         )
         .on(
           "postgres_changes",
-          { event: "*", schema: "public", table: "handouts_tag_section" },
+          { event: "*", schema: "public", table: "handouts_tag_section", filter: `section_id=eq.${sectionId}` },
           (payload) => {
-            if (sectionId && payload.new.section_id === sectionId) {
-              fetchReminders(sectionId);
-            }
+            fetchReminders(sectionId);
           }
         )
         .subscribe();
+      
 
       return () => {
         supabase.removeChannel(remindersChannel);

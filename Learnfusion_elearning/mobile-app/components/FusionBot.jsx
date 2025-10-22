@@ -163,8 +163,8 @@ const FusionBot = ({ currentUser }) => {
   return (
     <KeyboardAvoidingView
       style={styles.body}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+      behavior={Platform.OS === "ios" ? "padding" : "padding"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 20}
     >
       <View style={{ flex: 1 }}>
         <ScrollView

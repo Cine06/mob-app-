@@ -24,6 +24,8 @@ export default function MessageDetails() {
   const router = useRouter();
   const { name, avatar, receiverId } = useLocalSearchParams();
   const [dropdownVisible, setDropdownVisible] = useState(false);
+  const [headerName, setHeaderName] = useState(name);
+  const [headerAvatar, setHeaderAvatar] = useState(avatar);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [currentUser, setCurrentUser] = useState(null);
@@ -45,6 +47,29 @@ export default function MessageDetails() {
     };
     setup();
   }, []);
+
+  // 🔹 Fetch receiver info if not passed in params
+  useEffect(() => {
+    const fetchReceiverInfo = async () => {
+      if (!name && receiverId) {
+        const { data, error } = await supabase
+          .from("users")
+          .select("first_name, last_name, profile_picture")
+          .eq("id", receiverId)
+          .single();
+
+        if (error) {
+          console.error("Error fetching receiver info:", error);
+        } else if (data) {
+          setHeaderName(`${data.first_name || ""} ${data.last_name || ""}`.trim());
+          setHeaderAvatar(data.profile_picture);
+        }
+      }
+    };
+
+    fetchReceiverInfo();
+  }, [receiverId, name]);
+
 
   // 🔹 Mark messages as read in DB
   const markMessagesAsRead = async (currentUserId, senderId) => {
@@ -278,9 +303,9 @@ export default function MessageDetails() {
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior={Platform.OS === "ios" ? "padding" : "padding"}
         style={{ flex: 1 }}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : -500} // Adjust if needed
+        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
         <View style={{ flex: 1 }}>
           {/* 🔹 Header */}
@@ -290,10 +315,10 @@ export default function MessageDetails() {
             </TouchableOpacity>
             <View style={styles.headerTitle}>
               <Image
-                source={avatar ? { uri: avatar } : require("../assets/default_profile.png")}
+                source={headerAvatar ? { uri: headerAvatar } : require("../assets/default_profile.png")}
                 style={styles.avatar}
               />
-              <Text style={styles.headerText}>{name}</Text>
+              <Text style={styles.headerText}>{headerName || 'Chat'}</Text>
             </View>
             <FontAwesome5 name="envelope" size={20} color="white" style={styles.icon} />
           </View>

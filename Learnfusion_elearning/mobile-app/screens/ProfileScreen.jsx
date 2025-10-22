@@ -1,5 +1,5 @@
-import { View, Text, TouchableOpacity, Image, Modal, TextInput, ScrollView, Alert } from "react-native";
-import { useState, useEffect, useCallback } from "react";
+import { View, Text, TouchableOpacity, Image, Modal, TextInput, ScrollView, Alert, KeyboardAvoidingView, Platform } from "react-native";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { supabase } from "../utils/supabaseClient";
@@ -185,51 +185,57 @@ export default function ProfileScreen() {
         </View>
 
         <Modal visible={modalVisible} transparent animationType="slide">
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Information</Text>
-              
-              <TouchableOpacity 
-                onPress={() => {
-                  if (isEditing && !isUpdating) {
-                    updateContactNumber(); 
-                  } else {
-                    setIsEditing(!isEditing);
-                  }
-                }} 
-                style={styles.editIcon}
-                disabled={isUpdating}
-              >
-                <Ionicons name={isEditing ? "save" : "create"} size={24} color={isUpdating ? "#aaa" : "#046a38"} />
-              </TouchableOpacity>
-              
-              <ScrollView style={styles.scrollContainer}>
-                <Text style={styles.label}>Fullname: {fname} {mname} {lname}</Text>
-                <Text style={styles.label}>Email: {email}</Text>
-                <Text style={styles.label}>School ID: {schoolId}</Text>
-                <Text style={styles.label}>Section: {section}</Text>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "padding"}
+            style={{ flex: 1 }}
+            keyboardVerticalOffset={Platform.OS === "ios" ? 0 : -150}
+          >
+            <View style={styles.modalContainer}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>Information</Text>
+                
+                <TouchableOpacity 
+                  onPress={() => {
+                    if (isEditing && !isUpdating) {
+                      updateContactNumber(); 
+                    } else {
+                      setIsEditing(!isEditing);
+                    }
+                  }} 
+                  style={styles.editIcon}
+                  disabled={isUpdating}
+                >
+                  <Ionicons name={isEditing ? "save" : "create"} size={24} color={isUpdating ? "#aaa" : "#046a38"} />
+                </TouchableOpacity>
+                
+                <ScrollView style={styles.scrollContainer}>
+                  <Text style={styles.label}>Fullname: {fname} {mname} {lname}</Text>
+                  <Text style={styles.label}>Email: {email}</Text>
+                  <Text style={styles.label}>School ID: {schoolId}</Text>
+                  <Text style={styles.label}>Section: {section}</Text>
 
-                {isEditing ? ( 
-                  <TextInput 
-                    style={styles.input}
-                    value= {contactNumber}
-                    onChangeText={setContactNumber}
-                    placeholder="Enter contact number"
-                    keyboardType="phone-pad"
-                  />
-                ) : (
-                  <Text style={styles.label}>Contact Number: {contactNumber || "Not set"}</Text>
-                )}
-              </ScrollView>
+                  {isEditing ? ( 
+                    <TextInput 
+                      style={styles.input}
+                      value= {contactNumber}
+                      onChangeText={setContactNumber}
+                      placeholder="Enter contact number"
+                      keyboardType="phone-pad"
+                    />
+                  ) : (
+                    <Text style={styles.label}>Contact Number: {contactNumber || "Not set"}</Text>
+                  )}
+                </ScrollView>
 
-              <TouchableOpacity style={styles.closeButton} onPress={() => {
-                setModalVisible(false);
-                setIsEditing(false); // Reset editing state on close
-              }}>
-                <Text style={styles.closeButtonText}>Close</Text>
-              </TouchableOpacity>
+                <TouchableOpacity style={styles.closeButton} onPress={() => {
+                  setModalVisible(false);
+                  setIsEditing(false); // Reset editing state on close
+                }}>
+                  <Text style={styles.closeButtonText}>Close</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
 
       </View>
