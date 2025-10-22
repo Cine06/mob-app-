@@ -108,7 +108,6 @@ export default function LoginScreen() {
               />
             </TouchableOpacity>
           </View>
-
           <TouchableOpacity style={styles.loginButton} onPress={handleLogin} disabled={loading}>
             {loading ? (
               <ActivityIndicator color="#fff" />
@@ -116,6 +115,7 @@ export default function LoginScreen() {
               <Text style={styles.loginButtonText}>LOGIN</Text>
             )}
           </TouchableOpacity>
+          
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
