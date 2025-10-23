@@ -137,6 +137,10 @@ export default function AssignmentDetails() {
   const [isUploading, setIsUploading] = useState(false);
   const [submissionScore, setSubmissionScore] = useState(null);
   const [viewingDocument, setViewingDocument] = useState(null); // For instructions/lessons
+  const [attemptCount, setAttemptCount] = useState(0);
+  const [viewingResults, setViewingResults] = useState(false);
+  const [allowedAttempts, setAllowedAttempts] = useState(1);
+  const [isGraded, setIsGraded] = useState(false);
 
   useEffect(() => {
     if (!assessmentId || !assignedAssessmentId) {
@@ -146,9 +150,10 @@ export default function AssignmentDetails() {
     }
     
     const initialize = async () => {
-      const userData = await getUserData();
-      await fetchAssignmentData();
-      await checkAssignmentCompletion(userData);
+      const currentUser = await getUserData();
+      if (currentUser) {
+        await fetchAssignmentData(currentUser);
+      }
     };
     initialize();
   }, [assessmentId, assignedAssessmentId]);
@@ -171,7 +176,7 @@ export default function AssignmentDetails() {
     }
   };
 
-  const fetchAssignmentData = async () => {
+  const fetchAssignmentData = async (currentUser) => {
     try {
       setLoading(true);
       setError(null);
@@ -190,7 +195,7 @@ export default function AssignmentDetails() {
       }
 
       const { data: assigned, error: assignedError } = await supabase
-        .from('assigned_assessments')
+        .from('assigned_assessments') // Fetch allowed_attempts here
         .select('*')
         .eq('id', assignedAssessmentId)
         .single();
@@ -203,6 +208,10 @@ export default function AssignmentDetails() {
 
       setAssignmentData(assessment);
       setAssignedData(assigned);
+      setAllowedAttempts(assigned.allowed_attempts || 1);
+
+      // Now that we have assignedData, check completion status
+      await checkAssignmentCompletion(currentUser, assigned); // Pass both user and the newly fetched assigned data
     } catch (err) {
       console.error('Error fetching assignment data:', err);
       setError('Failed to load assignment data: ' + err.message);
@@ -211,29 +220,46 @@ export default function AssignmentDetails() {
     }
   };
 
-  const checkAssignmentCompletion = async (currentUser) => {
+  const checkAssignmentCompletion = async (currentUser, fetchedAssignedData) => {
     try {
       if (!currentUser || !currentUser.id || !assignedAssessmentId) return;
 
-      const { data: takeData, error: takeError } = await supabase
+      // Use the freshly fetched assigned data if available, otherwise use state
+      const currentAssignedData = fetchedAssignedData || assignedData;
+      if (!currentAssignedData) {
+        console.log("checkAssignmentCompletion: assignedData not available yet.");
+        return;
+      }
+
+      const { data: takes, error: takesError } = await supabase
         .from('student_assessments_take')
-        .select('id, score')
+        .select('id, score, created_at')
         .eq('assigned_assessments_id', assignedAssessmentId)
         .eq('users_id', currentUser.id)
-        .single();
+        .order('created_at', { ascending: false });
 
-      if (takeError || !takeData) return;
+      if (takesError) throw takesError;
 
-      setSubmissionScore(takeData.score);
+      setAttemptCount(takes.length);
+
+      if (takes.length === 0) return;
+
+      const latestTake = takes[0];
+      setSubmissionScore(latestTake.score);
+      // If the latest take has a score, it means it has been graded.
+      if (latestTake.score !== null) {
+        setIsGraded(true);
+      }
 
       const { data: answerData, error: answerError } = await supabase
         .from('student_assessments_answer')
         .select('answer')
-        .eq('student_assessments_take_id', takeData.id)
+        .eq('student_assessments_take_id', latestTake.id)
         .eq('users_id', currentUser.id);
 
       if (!answerError && answerData && answerData.length > 0) {
-        setIsCompleted(true);
+        setIsCompleted(takes.length >= (currentAssignedData.allowed_attempts || 1));
+        setViewingResults(true); // If there's a submission, start in results view
         setCompletedAnswers(answerData.map(a => JSON.parse(a.answer)));
         const completedAnswersObj = {};
         answerData.forEach(a => {
@@ -248,7 +274,7 @@ export default function AssignmentDetails() {
   };
 
   const handleArrayAnswerChange = (questionIndex, newAnswers) => {
-    if (!isCompleted) {
+    if (!viewingResults) {
       setAnswers({ ...answers, [questionIndex]: newAnswers });
     }
   };
@@ -291,7 +317,7 @@ export default function AssignmentDetails() {
   };
 
   const handleAnswerChange = (answer) => {
-    if (!isCompleted) {
+    if (!viewingResults) {
       setAnswers({ ...answers, [currentQuestionIndex]: answer });
     }
   };
@@ -302,8 +328,8 @@ export default function AssignmentDetails() {
       return;
     }
 
-    if (isCompleted) {
-      Alert.alert('Assignment Already Completed', 'You have already submitted this assignment.');
+    if (attemptCount >= allowedAttempts) {
+      Alert.alert('No Attempts Left', 'You have used all your attempts for this assignment.');
       return;
     }
 
@@ -341,16 +367,29 @@ export default function AssignmentDetails() {
 
       if (takeError) throw takeError;
 
-      const answerPromises = Object.entries(answers).map(([questionIndex, answer]) => {
-        return supabase.from('student_assessments_answer').insert({
-          student_assessments_take_id: takeData.id.toString(),
-          users_id: user.id,
-          answer: JSON.stringify({
-            questionIndex: parseInt(questionIndex),
-            answer: answer
+      const isFileSubmissionOnly = questions.length === 1 && questions[0].activityType === 'File Submission';
+      let answerPromises;
+
+      if (isFileSubmissionOnly) {
+        // For file submission, there's only one answer entry for question index 0
+        const fileAnswer = answers[0];
+        answerPromises = [
+          supabase.from('student_assessments_answer').insert({
+            student_assessments_take_id: takeData.id.toString(),
+            users_id: user.id,
+            answer: JSON.stringify({ questionIndex: 0, answer: fileAnswer })
           })
+        ];
+      } else {
+        // For other or mixed types, loop through all answers
+        answerPromises = Object.entries(answers).map(([questionIndex, answer]) => {
+          return supabase.from('student_assessments_answer').insert({
+            student_assessments_take_id: takeData.id.toString(),
+            users_id: user.id,
+            answer: JSON.stringify({ questionIndex: parseInt(questionIndex), answer: answer })
+          });
         });
-      });
+      }
 
       const answerResults = await Promise.all(answerPromises);
       const hasAnswerError = answerResults.some(result => result.error);
@@ -384,7 +423,18 @@ export default function AssignmentDetails() {
         message = `You scored ${correctAnswersCount}/${totalAutoGradable} on the auto-graded items. The rest of your submission is waiting for grading.`;
       }
       
-      setIsCompleted(true);
+      const newAttemptCount = attemptCount + 1;
+      setAttemptCount(newAttemptCount);
+      setIsCompleted(newAttemptCount >= allowedAttempts);
+      setViewingResults(true);
+
+      // Update the completedAnswers state locally to immediately show the submitted answers
+      const submittedAnswersForReview = Object.entries(answers).map(([qIndex, ans]) => ({
+        questionIndex: parseInt(qIndex),
+        answer: ans,
+      }));
+      setCompletedAnswers(submittedAnswersForReview);
+
       setSubmissionScore(null); // Initially null until graded
 
       Alert.alert("Submission Successful!", message, [
@@ -400,7 +450,7 @@ export default function AssignmentDetails() {
   };
 
   const handleFilePick = async () => {
-    if (isCompleted) return;
+    if (viewingResults) return;
   
     try {
       const result = await DocumentPicker.getDocumentAsync({
@@ -515,6 +565,29 @@ export default function AssignmentDetails() {
     }
   };
 
+  const handleReattempt = () => {
+    if (isGraded) {
+      Alert.alert("Graded", "This assignment has already been graded and cannot be re-attempted.");
+      return;
+    }
+    if (attemptCount >= allowedAttempts) {
+      Alert.alert("No Attempts Left", "You have used all your available attempts.");
+      return;
+    }
+    Alert.alert(
+      "Start New Attempt?",
+      "This will clear your previous answers and start a new attempt. Are you sure?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Yes, Start", onPress: () => {
+            setViewingResults(false);
+            setAnswers({});
+            setCurrentQuestionIndex(0);
+        }}
+      ]
+    )
+  };
+
   const goToNextQuestion = () => {
     if (currentQuestionIndex < parseQuestions().length - 1) setCurrentQuestionIndex(currentQuestionIndex + 1);
   };
@@ -602,12 +675,22 @@ export default function AssignmentDetails() {
               </Text>
             )}
           </View>
+          <View style={styles.detailsRow}>
+            <Text style={styles.detailText}>
+              Attempts: {attemptCount} / {allowedAttempts}
+            </Text>
+
+          </View>
           
-          {isCompleted && hasAutoGradableQuestions && (
+          {viewingResults && hasAutoGradableQuestions && (
             <View style={styles.completedInfoBox}>
-              <Text style={styles.completedInfoTitle}>Assignment Completed!</Text>
+              <Text style={styles.completedInfoTitle}>
+                {isCompleted ? 'Assignment Completed!' : 'Attempt Submitted!'}
+              </Text>
               <Text style={styles.completedInfoText}>
-                You have successfully submitted this assignment. Your answers are saved and cannot be modified.
+                {isCompleted
+                  ? 'You have used all your attempts. Your final submission is saved.'
+                  : 'You have submitted this attempt. You can review your answers below or choose to re-attempt.'}
               </Text>
               {hasAutoGradableQuestions && (
                 <TouchableOpacity
@@ -626,8 +709,8 @@ export default function AssignmentDetails() {
         {/* Questions */}
         {currentQuestion && (
           <View style={styles.card}>
-            <View style={styles.questionHeaderContainer}>              
-                {isCompleted && showCorrectAnswers && currentQuestion.activityType !== 'File Submission' && (
+            <View style={styles.questionHeaderContainer}>
+                {viewingResults && showCorrectAnswers && currentQuestion.activityType !== 'File Submission' && (
                     <Text style={[styles.feedbackIcon, isAnswerCorrect(currentQuestion, currentQuestionIndex, answers[currentQuestionIndex]) ? styles.correctIcon : styles.incorrectIcon]}>
                         {isAnswerCorrect(currentQuestion, currentQuestionIndex, answers[currentQuestionIndex]) ? '✓' : '✗'}
                     </Text>
@@ -648,30 +731,30 @@ export default function AssignmentDetails() {
                     const isUserAnswer = answers[currentQuestionIndex] === choice;
                     const correctAnswer = getCorrectAnswer(currentQuestion);
                     const isCorrectChoice = correctAnswer === choice;
-
+  
                     let choiceStyle = [styles.choiceButton];
-                    if (isCompleted && showCorrectAnswers) {
+                    if (viewingResults && showCorrectAnswers) {
                       if (isCorrectChoice) {
                         choiceStyle.push(styles.correctChoice);
                       } else if (isUserAnswer && !isCorrectChoice) {
                         choiceStyle.push(styles.incorrectChoice);
                       }
-                    } else if (isUserAnswer) {
+                    } else if (isUserAnswer || (viewingResults && isUserAnswer)) {
                       choiceStyle.push(styles.selectedChoice);
                     }
-
+  
                     return (
                       <TouchableOpacity
                         key={choiceIndex}
-                        style={[...choiceStyle, isCompleted && styles.disabledElement]}
+                        style={[...choiceStyle, viewingResults && styles.disabledElement]}
                         onPress={() => handleAnswerChange(choice)}
-                        disabled={isCompleted}
+                        disabled={viewingResults}
                       >
                         <View style={[styles.radioCircle, isUserAnswer && styles.selectedRadio]}>
                           {isUserAnswer && <View style={styles.radioInnerCircle} />}
                         </View>
                         <Text style={styles.choiceText}>{choice}</Text>
-                        {isCompleted && showCorrectAnswers && isCorrectChoice && <Text style={styles.feedbackIconSmall}>✓</Text>}
+                        {viewingResults && showCorrectAnswers && isCorrectChoice && <Text style={styles.feedbackIconSmall}>✓</Text>}
                       </TouchableOpacity>
                     );
                   })}
@@ -690,25 +773,25 @@ export default function AssignmentDetails() {
                   {['True', 'False'].map((option) => {
                     const isUserAnswer = answers[currentQuestionIndex] === option;
                     const correctAnswer = getCorrectAnswer(currentQuestion);
-                    const isCorrectChoice = correctAnswer === option;
+                    const isCorrectChoice = correctAnswer.toLowerCase() === option.toLowerCase();
 
                     let buttonStyle = [styles.trueFalseButton];
-                    if (isCompleted && showCorrectAnswers) {
+                    if (viewingResults && showCorrectAnswers) {
                       if (isCorrectChoice) {
                         buttonStyle.push(styles.correctChoice);
                       } else if (isUserAnswer && !isCorrectChoice) {
                         buttonStyle.push(styles.incorrectChoice);
                       }
-                    } else if (isUserAnswer) {
+                    } else if (isUserAnswer || (viewingResults && isUserAnswer)) {
                       buttonStyle.push(styles.selectedChoice);
                     }
 
                     return (
                       <TouchableOpacity
                         key={option}
-                        style={[...buttonStyle, isCompleted && styles.disabledElement]}
+                        style={[...buttonStyle, viewingResults && styles.disabledElement]}
                         onPress={() => handleAnswerChange(option)}
-                        disabled={isCompleted}
+                        disabled={viewingResults}
                       >
                         <Text style={[styles.trueFalseText, isUserAnswer && styles.selectedTrueFalseText]}>
                           {option}
@@ -730,22 +813,22 @@ export default function AssignmentDetails() {
               const isCorrect = isAnswerCorrect(currentQuestion, currentQuestionIndex, answers[currentQuestionIndex]);
               const correctAnswer = getCorrectAnswer(currentQuestion);
               let inputStyle = [styles.textInput];
-              if (isCompleted && showCorrectAnswers) {
+              if (viewingResults && showCorrectAnswers) {
                 inputStyle.push(isCorrect ? styles.correctChoice : styles.incorrectChoice);
               }
 
               return (
                 <>
                   <TextInput
-                    style={[...inputStyle, isCompleted && styles.disabledElement]}
+                    style={[...inputStyle, (isCompleted || viewingResults) && styles.disabledElement]}
                     placeholder={isCompleted ? 'Answer submitted' : `Enter your ${currentQuestion.activityType.toLowerCase()}...`}
                     value={answers[currentQuestionIndex] || ''}
                     onChangeText={(text) => handleAnswerChange(text)}
                     multiline
                     numberOfLines={3}
-                    editable={!isCompleted}
+                    editable={!viewingResults}
                   />
-                  {isCompleted && showCorrectAnswers && !isCorrect && (
+                  {viewingResults && showCorrectAnswers && !isCorrect && (
                     <View style={styles.correctAnswerBox}>
                       <Text style={styles.correctAnswerLabel}>Correct Answer:</Text>
                       <Text style={styles.correctAnswerText}>{correctAnswer}</Text>
@@ -762,7 +845,7 @@ export default function AssignmentDetails() {
                 questionIndex={currentQuestionIndex}
                 onAnswerChange={handleArrayAnswerChange}
                 answers={answers[currentQuestionIndex]}
-                isCompleted={isCompleted}
+                isCompleted={viewingResults}
                 showCorrectAnswers={showCorrectAnswers}
               />
             )}
@@ -787,19 +870,11 @@ export default function AssignmentDetails() {
                   </TouchableOpacity>
                 )}
                 <View>
-                  {isCompleted ? (
+                  {viewingResults ? ( // When viewing results of a submission
                     <View>
-                      {submissionScore !== null ? (
-                        <View style={styles.gradeBox}>
-                          <Text style={styles.gradeLabel}>Final Grade: {submissionScore} / {currentQuestion.maxScore || 'N/A'}</Text>
-                        </View>
-                      ) : (
-                        <View style={styles.waitingGradeBox}>
-                          <Text style={styles.waitingGradeText}>Waiting for grading</Text>
-                        </View>
-                      )}
-                      {(answers[currentQuestionIndex] || []).map((file, index) => (
-                        <TouchableOpacity 
+                      {/* List of submitted files */}
+                      {(completedAnswers.find(a => a.questionIndex === currentQuestionIndex)?.answer || []).map((file, index) => (
+                        <TouchableOpacity
                           key={index}
                           style={styles.fileSubmissionContainer}
                           onPress={() => handleViewSubmittedFile(file)}
@@ -811,10 +886,21 @@ export default function AssignmentDetails() {
                           <MaterialCommunityIcons name="eye-outline" size={24} color="#2E7D32" style={{ marginLeft: 'auto' }} />
                         </TouchableOpacity>
                       ))}
+
+                      {/* Grading status below the files */}
+                      {submissionScore !== null ? (
+                        <View style={styles.gradeBox}>
+                          <Text style={styles.gradeLabel}>Graded</Text>
+                        </View>
+                      ) : hasAutoGradableQuestions ? null : ( // Show "Waiting for grading" only if it's purely file submission
+                        <View style={styles.waitingGradeBox}>
+                          <Text style={styles.waitingGradeText}>Waiting for grading</Text>
+                        </View>
+                      )}
                     </View>
-                  ) : (
-                    <>
-                      {(answers[currentQuestionIndex] || []).map((file, index) => (
+                  ) : ( // When user is actively answering/uploading
+                    <> 
+                      {(answers[currentQuestionIndex] || []).map((file, index) => ( // This part is for when user is actively uploading before first submission
                         <View key={index} style={styles.fileSubmissionContainer}>
                           <MaterialCommunityIcons name="file-document-outline" size={24} color="#046a38" />
                           <Text style={[styles.fileSubmissionText, {color: '#046a38'}]} numberOfLines={1}>
@@ -826,7 +912,7 @@ export default function AssignmentDetails() {
                         </View>
                       ))}
                       {/* The upload button should always be visible if not completed, to allow adding more files */}
-                        <TouchableOpacity style={styles.uploadButton} onPress={handleFilePick} disabled={isUploading}>
+                        <TouchableOpacity style={[styles.uploadButton, viewingResults && styles.disabledButton]} onPress={handleFilePick} disabled={isUploading || viewingResults}>
                           <MaterialCommunityIcons name="upload" size={22} color="#fff" />
                           <Text style={styles.uploadButtonText}>{isUploading ? 'Uploading...' : 'Upload File'}</Text>
                         </TouchableOpacity>
@@ -865,7 +951,7 @@ export default function AssignmentDetails() {
           </View>
         )}
 
-        {isCompleted && (
+        {viewingResults && (
           <View style={styles.summaryCard}>
             <Text style={styles.summaryTitle}>Results Summary</Text>
             {(() => {
@@ -908,21 +994,39 @@ export default function AssignmentDetails() {
           </View>
         )}
 
-        {/* Submit Button */}
-        <TouchableOpacity
-          style={[styles.submitButton, (isSubmitting || isCompleted || isUploading) && styles.disabledButton]}
-          onPress={handleSubmit}
-          disabled={isSubmitting || isCompleted || isUploading}
-        >
-          <Text style={styles.submitButtonText}>
-            {isCompleted 
-              ? '✓ Assignment Completed' 
-              : isSubmitting 
-                ? 'Submitting...' 
-                : 'Submit Assignment'
-            }
-          </Text>
-        </TouchableOpacity>
+        {/* Action Buttons */}
+        {viewingResults ? (
+          isGraded ? (
+            <View style={[styles.submitButton, styles.disabledButton, { backgroundColor: '#4CAF50' }]}>
+              <Text style={styles.submitButtonText}>✓ Assignment Graded</Text>
+            </View>
+          ) : !isCompleted && attemptCount < allowedAttempts ? (
+            <TouchableOpacity
+              style={[styles.submitButton, { backgroundColor: '#FFC107' }]}
+              onPress={handleReattempt}
+              disabled={isGraded || deadlinePassed}
+            >
+              <Text style={[styles.submitButtonText, { color: '#000' }]}>Re-attempt Assignment</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={[styles.submitButton, styles.disabledButton]}>
+              <Text style={styles.submitButtonText}>✓ All Attempts Used</Text>
+            </View>
+          )
+        ) : (
+          <TouchableOpacity
+            style={[styles.submitButton, (isSubmitting || isUploading || viewingResults) && styles.disabledButton]}
+            onPress={handleSubmit}
+            disabled={isSubmitting || isUploading}
+          >
+            <Text style={styles.submitButtonText}>
+              {isSubmitting 
+                  ? 'Submitting...' 
+                  : `Submit Assignment`
+              }
+            </Text>
+          </TouchableOpacity>
+        )}
         
         </ScrollView>
 

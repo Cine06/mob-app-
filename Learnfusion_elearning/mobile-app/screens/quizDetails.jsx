@@ -126,6 +126,9 @@ const QuizDetails = () => {
   const [isCompleted, setIsCompleted] = useState(false);
   const [completedAnswers, setCompletedAnswers] = useState([]);
   const [showCorrectAnswers, setShowCorrectAnswers] = useState(false);
+  const [attemptCount, setAttemptCount] = useState(0);
+  const [viewingResults, setViewingResults] = useState(false);
+  const [allowedAttempts, setAllowedAttempts] = useState(1);
 
   useEffect(() => {
     if (!assessmentId || !assignedAssessmentId) {
@@ -155,27 +158,39 @@ const QuizDetails = () => {
     }
   };
 
-  const checkQuizCompletion = async (currentUser) => {
+  const checkQuizCompletion = async (currentUser, fetchedAssignedData) => {
     try {
       if (!currentUser || !currentUser.id || !assignedAssessmentId) return;
+  
+      // Use the freshly fetched assigned data if available, otherwise use state
+      const currentAssignedData = fetchedAssignedData || assignedData;
+      if (!currentAssignedData) {
+        console.log("checkQuizCompletion: assignedData not available yet.");
+        return;
+      }
 
-      const { data: takeData, error: takeError } = await supabase
+      const { data: takes, error: takesError } = await supabase
         .from('student_assessments_take')
-        .select('id')
+        .select('id, created_at')
         .eq('assigned_assessments_id', assignedAssessmentId)
         .eq('users_id', currentUser.id)
-        .single();
-
-      if (takeError || !takeData) return; // No completion found, which is normal.
-      
+        .order('created_at', { ascending: false });
+  
+      if (takesError) throw takesError;
+  
+      setAttemptCount(takes.length);
+  
+      if (takes.length === 0) return;
+  
+      const latestTake = takes[0];
       const { data: answerData, error: answerError } = await supabase
         .from('student_assessments_answer')
         .select('answer')
-        .eq('student_assessments_take_id', takeData.id)
+        .eq('student_assessments_take_id', latestTake.id)
         .eq('users_id', currentUser.id);
-
       if (!answerError && answerData && answerData.length > 0) {
-        setIsCompleted(true);
+        setIsCompleted(takes.length >= (currentAssignedData.allowed_attempts || 1));
+        setViewingResults(true); // If there's a submission, start in results view
         setCompletedAnswers(answerData.map(a => JSON.parse(a.answer)));
         const completedAnswersObj = {};
         answerData.forEach(a => {
@@ -189,7 +204,7 @@ const QuizDetails = () => {
     }
   };
 
-  const fetchQuizData = async () => {
+  const fetchQuizData = async (currentUser) => {
     try {
       setLoading(true);
       setError(null);
@@ -230,6 +245,10 @@ const QuizDetails = () => {
 
       setQuizData(assessmentData);
       setAssignedData(assignedData);
+      setAllowedAttempts(assignedData.allowed_attempts || 1);
+
+      // Now that we have assignedData, check completion status
+      await checkQuizCompletion(currentUser, assignedData);
       
     } catch (error) {
       console.error('Error fetching quiz data:', error);
@@ -238,6 +257,12 @@ const QuizDetails = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (user) {
+      fetchQuizData(user);
+    }
+  }, [user, assessmentId, assignedAssessmentId]);
   
   const submitQuiz = async () => {
     if (!user || !quizData || !assignedData) {
@@ -245,12 +270,8 @@ const QuizDetails = () => {
       return;
     }
 
-    if (isCompleted) {
-      Alert.alert(
-        'Assessment Already Completed', 
-        'You have already submitted this assessment. You cannot submit it again.',
-        [{ text: 'OK' }]
-      );
+    if (attemptCount >= allowedAttempts) {
+      Alert.alert('No Attempts Left', 'You have used all your attempts for this quiz.');
       return;
     }
 
@@ -317,7 +338,10 @@ const QuizDetails = () => {
       ).length;
 
       // Update state to show completion UI
-      setIsCompleted(true);
+      const newAttemptCount = attemptCount + 1;
+      setAttemptCount(newAttemptCount);
+      setIsCompleted(newAttemptCount >= allowedAttempts);
+      setViewingResults(true);
 
       Alert.alert(
         "Submission Successful!",
@@ -333,6 +357,24 @@ const QuizDetails = () => {
     }
   };
 
+  const handleReattempt = () => {
+    if (attemptCount >= allowedAttempts) {
+      Alert.alert("No Attempts Left", "You have used all your available attempts.");
+      return;
+    }
+    Alert.alert(
+      "Start New Attempt?",
+      "This will clear your previous answers and start a new attempt. Are you sure?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Yes, Start", onPress: () => {
+            setViewingResults(false);
+            setAnswers({});
+            setCurrentQuestionIndex(0);
+        }}
+      ]
+    )
+  };
   const handleAnswer = (answer) => {
     if (!isCompleted) {
       setAnswers({ ...answers, [currentQuestionIndex]: answer });
@@ -340,7 +382,7 @@ const QuizDetails = () => {
   };
 
   const handleArrayAnswerChange = (questionIndex, newAnswers) => {
-    if (!isCompleted) {
+    if (!viewingResults) {
       setAnswers({ ...answers, [questionIndex]: newAnswers });
     }
   };
@@ -577,14 +619,19 @@ const QuizDetails = () => {
               </Text>
             )}
           </View>
+          <View style={{ marginTop: 10 }}>
+            <Text style={{ fontSize: 14, color: '#666' }}>Attempts: {attemptCount} / {allowedAttempts}</Text>
+          </View>
           
-          {isCompleted && (
+          {viewingResults && (
             <View style={styles.completedInfoBox}>
               <Text style={styles.completedInfoTitle}>
-                Assessment Completed!
+                {isCompleted ? 'Assessment Completed!' : 'Attempt Submitted!'}
               </Text>
               <Text style={styles.completedInfoText}>
-                You have successfully submitted this assessment. Your answers are saved and cannot be modified.
+                {isCompleted
+                  ? 'You have used all your attempts. Your final answers are saved.'
+                  : 'You have submitted this attempt. You can review your answers below or choose to re-attempt.'}
               </Text>
               
               <TouchableOpacity
@@ -604,7 +651,7 @@ const QuizDetails = () => {
           <View style={styles.card}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 15 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                {isCompleted && showCorrectAnswers && (
+                {viewingResults && showCorrectAnswers && (
                   <View style={{ marginRight: 10 }}>
                     {isAnswerCorrect(currentQuestion, currentQuestionIndex, answers[currentQuestionIndex]) ? (
                       <Text style={{ color: '#4CAF50', fontSize: 20 }}>✓</Text>
@@ -635,7 +682,7 @@ const QuizDetails = () => {
                   let borderWidth = 1;
                   let backgroundColor = '#fff';
                   
-                  if (isCompleted && showCorrectAnswers) {
+                  if (viewingResults && showCorrectAnswers) {
                     if (isCorrectAnswer) {
                       borderColor = '#4CAF50'; 
                       borderWidth = 3;
@@ -662,10 +709,10 @@ const QuizDetails = () => {
                         borderRadius: 8,
                         marginBottom: 10,
                         backgroundColor: backgroundColor,
-                        opacity: isCompleted ? 0.7 : 1,
+                        opacity: viewingResults ? 0.7 : 1,
                       }}
                       onPress={() => handleAnswer(choice)}
-                      disabled={isCompleted}
+                      disabled={viewingResults}
                     >
                       <View style={{
                         width: 20,
@@ -687,7 +734,7 @@ const QuizDetails = () => {
                   );
                 })}
                 
-                {isCompleted && showCorrectAnswers && !isAnswerCorrect(currentQuestion, currentQuestionIndex, answers[currentQuestionIndex]) && (
+                {viewingResults && showCorrectAnswers && !isAnswerCorrect(currentQuestion, currentQuestionIndex, answers[currentQuestionIndex]) && (
                   <View style={styles.correctAnswerBox}>
                     <Text style={styles.correctAnswerLabel}>Correct Answer:</Text>
                     <Text style={styles.correctAnswerText}>{getCorrectAnswer(currentQuestion, currentQuestionIndex)}</Text>
@@ -708,7 +755,7 @@ const QuizDetails = () => {
                   let borderWidth = 2;
                   let backgroundColor = '#fff';
                   
-                  if (isCompleted && showCorrectAnswers) {
+                  if (viewingResults && showCorrectAnswers) {
                     if (isCorrectAnswer) {
                       borderColor = '#4CAF50'; 
                       borderWidth = 3;
@@ -734,10 +781,10 @@ const QuizDetails = () => {
                         borderRadius: 8,
                         backgroundColor: backgroundColor,
                         alignItems: 'center',
-                        opacity: isCompleted ? 0.7 : 1,
+                        opacity: viewingResults ? 0.7 : 1,
                       }}
                       onPress={() => handleAnswer(option)}
-                      disabled={isCompleted}
+                      disabled={viewingResults}
                     >
                       <Text style={{ 
                         fontSize: 16, 
@@ -758,8 +805,8 @@ const QuizDetails = () => {
                 <TextInput
                   style={[
                     styles.textInput,
-                    isCompleted && styles.disabledElement,
-                    isCompleted && showCorrectAnswers && (
+                    viewingResults && styles.disabledElement,
+                    viewingResults && showCorrectAnswers && (
                       isAnswerCorrect(currentQuestion, currentQuestionIndex, answers[currentQuestionIndex])
                         ? styles.correctChoice
                         : styles.incorrectChoice
@@ -770,9 +817,9 @@ const QuizDetails = () => {
                   onChangeText={(text) => handleAnswer(text)}
                   multiline
                   numberOfLines={3}
-                  editable={!isCompleted}
+                  editable={!viewingResults}
                 />
-                {isCompleted && showCorrectAnswers && !isAnswerCorrect(currentQuestion, currentQuestionIndex, answers[currentQuestionIndex]) && (
+                {viewingResults && showCorrectAnswers && !isAnswerCorrect(currentQuestion, currentQuestionIndex, answers[currentQuestionIndex]) && (
                   <View style={styles.correctAnswerBox}>
                     <Text style={styles.correctAnswerLabel}>Correct Answer:</Text>
                     <Text style={styles.correctAnswerText}>
@@ -788,13 +835,13 @@ const QuizDetails = () => {
               <MatchingQuestionAnswer
                 question={currentQuestion}
                 questionIndex={currentQuestionIndex}
-                onAnswerChange={handleArrayAnswerChange}
+                onAnswerChange={handleArrayAnswerChange} // This needs to be fixed
                 answers={answers}
-                isCompleted={isCompleted}
+                isCompleted={viewingResults}
                 showCorrectAnswers={showCorrectAnswers}
               />
             )}
-          </View>
+          </View> 
         )}
         
         {/* Navigation */}
@@ -835,7 +882,7 @@ const QuizDetails = () => {
         </View>
 
         {/* Assessment Results Summary */}
-        {isCompleted && showCorrectAnswers && (
+        {viewingResults && showCorrectAnswers && (
           <View style={styles.summaryCard}>
             <Text style={styles.summaryTitle}>
              Assessment Results Summary
@@ -890,30 +937,33 @@ const QuizDetails = () => {
               The deadline for this quiz has passed. You can no longer submit your answers.
             </Text>
           </View>
+        ) : viewingResults ? (
+          isCompleted ? (
+            <View style={[styles.submitButton, styles.disabledButton]}>
+              <Text style={styles.submitButtonText}>✓ All Attempts Used</Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={[styles.submitButton, { backgroundColor: '#FFC107' }]}
+              onPress={handleReattempt}
+            >
+              <Text style={[styles.submitButtonText, { color: '#000' }]}>Re-attempt Quiz</Text>
+            </TouchableOpacity>
+          )
         ) : (
           <TouchableOpacity
-            style={{
-              backgroundColor: isCompleted ? '#9E9E9E' : '#046a38',
-              padding: 18,
-              borderRadius: 12,
-              alignItems: 'center',
-              marginTop: 20,
-              marginBottom: 40,
-              opacity: (isSubmitting || isCompleted) ? 0.7 : 1,
-            }}
+            style={[
+              styles.submitButton,
+              isSubmitting && styles.disabledButton
+            ]}
             onPress={submitQuiz}
-            disabled={isSubmitting || isCompleted}
+            disabled={isSubmitting}
           >
-            <Text style={{ color: '#fff', fontSize: 18, fontWeight: '600' }}>
-              {isCompleted 
-                ? '✓ Quiz Completed' 
-                : isSubmitting 
-                  ? 'Submitting...' 
-                  : 'Submit Assessment'
-              }
+            <Text style={styles.submitButtonText}>
+              {isSubmitting ? 'Submitting...' : `Submit Quiz `}
             </Text>
           </TouchableOpacity>
-        )}
+        )} 
         
       </ScrollView>
       </View>
@@ -922,6 +972,9 @@ const QuizDetails = () => {
 };
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5', paddingTop: 35 },
+  submitButton: { backgroundColor: '#046a38', padding: 18, borderRadius: 12, alignItems: 'center', marginTop: 20, marginBottom: 40, justifyContent: 'center' },
+  submitButtonText: { color: '#fff', fontSize: 18, fontWeight: '600' },
+  disabledButton: { backgroundColor: '#9E9E9E' },
   customHeader: {
     flexDirection: 'row',
     alignItems: 'center',
