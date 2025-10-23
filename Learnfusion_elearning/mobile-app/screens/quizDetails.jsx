@@ -133,7 +133,6 @@ const QuizDetails = () => {
   const timerRef = React.useRef(null);
   const [hasStarted, setHasStarted] = useState(false);
   const [activeTake, setActiveTake] = useState(null);
-  const [showContinueScreen, setShowContinueScreen] = useState(false);
   const [showChoiceScreen, setShowChoiceScreen] = useState(false);
 
   useEffect(() => {
@@ -192,20 +191,22 @@ const QuizDetails = () => {
 
       const isTimed = currentAssignedData.time_limit > 0;
 
-      // Filter out 'in-progress' takes for timed quizzes
-      const completedTakes = takes.filter(take => {
+      // Check for an in-progress timed attempt first
+      for (const take of takes) {
         if (isTimed && take.started_at && take.score === null) {
           const endTime = new Date(take.started_at).getTime() + currentAssignedData.time_limit * 60 * 1000;
           // If score is null and time is not up, it's in-progress
           if (Date.now() < endTime) {
-            setActiveTake(take); // This is an active, unfinished attempt
-            setShowContinueScreen(true); // Show the continue/restart screen
-            return false; // Don't count it as a completed attempt yet
+            setActiveTake(take);
+            setHasStarted(true); // This is an active, unfinished attempt
+            startTimer(take.started_at, currentAssignedData.time_limit);
+            return; // Exit the function immediately to resume the attempt
           }
         }
-        return true; // Count as a completed attempt
-      });
+      }
 
+      // If no in-progress attempt was found, proceed to count completed takes
+      const completedTakes = takes.filter(take => take.score !== null || (take.started_at && new Date(take.started_at).getTime() + currentAssignedData.time_limit * 60 * 1000 < Date.now()));
       setAttemptCount(completedTakes.length);
 
       // If there are completed takes and they can re-attempt, show choice screen.
@@ -358,27 +359,9 @@ const QuizDetails = () => {
       router.back();
     }
   };
-  
-  const handleRestartAttempt = () => {
-    Alert.alert(
-      "Restart Attempt?",
-      "This will discard your current in-progress attempt and start a new one. This will use one of your available attempts. Are you sure?",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Yes, Restart", onPress: () => {
-            setShowContinueScreen(false);
-            setAnswers({});
-            setCurrentQuestionIndex(0);
-            setHasStarted(false); // Reset to show start screen for new attempt
-        }}
-      ]
-    )
-  };
-  const submitQuiz = async (isAutoSubmit = false) => {
-    if (!user || !quizData || !assignedData) {
-      Alert.alert('Error', 'Missing required data');
-      return;
-    }
+
+  const handleQuizSubmit = () => {
+    if (!user || !quizData || !assignedData) return;
 
     if (attemptCount >= allowedAttempts) {
       Alert.alert('No Attempts Left', 'You have used all your attempts for this quiz.');
@@ -386,23 +369,28 @@ const QuizDetails = () => {
     }
 
     const questions = parseQuestions();
-    // Only check for unanswered questions if it's not an auto-submission
-    if (!isAutoSubmit) {
-      const unansweredQuestions = questions.filter((_, index) => {
-        const answer = answers[index];
-        if (!answer) return true;
-        if (Array.isArray(answer)) { // For matching questions
-          return answer.some(a => !a || (typeof a === 'string' && a.trim() === ''));
-        }
-        return answer.toString().trim() === '';
-      });
-
-      if (unansweredQuestions.length > 0) {
-        Alert.alert('Incomplete', 'Please answer all questions before submitting.');
-        return;
+    const unansweredQuestions = questions.filter((_, index) => {
+      const answer = answers[index];
+      if (!answer) return true;
+      if (Array.isArray(answer)) { // For matching questions
+        return answer.some(a => !a || (typeof a === 'string' && a.trim() === ''));
       }
+      return answer.toString().trim() === '';
+    });
+
+    if (unansweredQuestions.length > 0) {
+      Alert.alert('Incomplete', 'Please answer all questions before submitting.');
+      return;
     }
 
+    Alert.alert(
+      "Confirm Submission",
+      "Are you sure you want to submit your answers?",
+      [{ text: "Cancel", style: "cancel" }, { text: "Submit", onPress: () => submitQuiz(false) }]
+    );
+  };
+
+  const submitQuiz = async (isAutoSubmit = false) => {
     setIsSubmitting(true);
 
     try {
@@ -505,12 +493,17 @@ const QuizDetails = () => {
       "This will clear your previous answers and start a new attempt. Are you sure?",
       [
         { text: "Cancel", style: "cancel" },
-        { text: "Yes, Start", onPress: () => {
-            setViewingResults(false);
-            setAnswers({});
-            setCurrentQuestionIndex(0);
-            setHasStarted(false); // Reset to show start screen for new attempt
-        }}
+        {
+          text: "Yes, Start", onPress: () => {
+              setViewingResults(false);
+              setAnswers({});
+              setCurrentQuestionIndex(0);
+              const isTimed = assignedData?.time_limit > 0;
+              // For non-timed quizzes, start immediately. For timed, show the start screen.
+              setActiveTake(null); // Clear the previous take record
+              setShowChoiceScreen(false); // Hide the choice screen to proceed
+              setHasStarted(!isTimed);
+          }}
       ]
     )
   };
@@ -614,32 +607,6 @@ const QuizDetails = () => {
             </TouchableOpacity>
             <TouchableOpacity style={styles.startCancelButton} onPress={handleReattempt}>
               <Text style={styles.startCancelButtonText}>Start New Attempt</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </>
-    );
-  }
-
-  if (showContinueScreen) {
-    return (
-      <>
-        <Stack.Screen options={{ headerShown: false }} />
-        <View style={styles.centered}>
-          <View style={styles.startCard}>
-            <Text style={styles.startTitle}>Attempt in Progress</Text>
-            <Text style={styles.startDescription}>
-              You have an unfinished attempt for this quiz.
-            </Text>
-            <TouchableOpacity style={styles.startButton} onPress={() => {
-              setShowContinueScreen(false);
-              setHasStarted(true);
-              startTimer(activeTake.started_at, assignedData.time_limit);
-            }}>
-              <Text style={styles.startButtonText}>Continue Attempt</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.startCancelButton} onPress={handleRestartAttempt}>
-              <Text style={styles.startCancelButtonText}>Restart (New Attempt)</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1060,7 +1027,7 @@ const QuizDetails = () => {
                 question={currentQuestion}
                 questionIndex={currentQuestionIndex}
                 onAnswerChange={handleArrayAnswerChange} // This needs to be fixed
-                answers={answers}
+                answers={answers[currentQuestionIndex]}
                 isCompleted={viewingResults}
                 showCorrectAnswers={showCorrectAnswers}
               />
@@ -1180,7 +1147,7 @@ const QuizDetails = () => {
               styles.submitButton,
               isSubmitting && styles.disabledButton
             ]}
-            onPress={submitQuiz}
+            onPress={handleQuizSubmit}
             disabled={isSubmitting}
           >
             <Text style={styles.submitButtonText}>

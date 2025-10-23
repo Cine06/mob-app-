@@ -24,6 +24,12 @@ import * as SecureStore from "expo-secure-store";
 
 const DEBUG = true;
 
+const log = (...args) => {
+  if (DEBUG) {
+    console.log(...args);
+  }
+};
+
 const {
   JDOODLE_CLIENT_ID,
   JDOODLE_CLIENT_SECRET,
@@ -582,9 +588,9 @@ public class AddNumbers {
     <>
       <Stack.Screen options={{ headerShown: false }} />
       <KeyboardAvoidingView
-        style={{ flex: 1 }}
+        style={styles.container}
         behavior={Platform.OS === "ios" ? "padding" : "padding"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 64}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : -150}
       >
         <View style={styles.container}>
           <View style={styles.header}>
