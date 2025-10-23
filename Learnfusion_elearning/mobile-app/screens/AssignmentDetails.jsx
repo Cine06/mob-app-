@@ -17,22 +17,17 @@ function MatchingQuestionAnswer({ question, questionIndex, onAnswerChange, answe
   const prompts = matchingPairs.map(p => p.left);
   const correctChoices = matchingPairs.map(p => p.right);
 
-  // `userAnswers` is an array of strings corresponding to the prompts
   const userAnswers = answers || Array(prompts.length).fill(null);
 
-  // State for the currently selected choice from the pool
   const [selectedChoice, setSelectedChoice] = useState(null);
 
   useEffect(() => {
-    // When the question changes, reset the selected choice
     setSelectedChoice(null);
   }, [questionIndex]);
 
   const handleSelectChoice = (choice) => {
     if (isCompleted) return;
-    // If the choice is already used in an answer slot, do nothing
     if (userAnswers.includes(choice)) return;
-    // Select or deselect the choice
     setSelectedChoice(prev => (prev === choice ? null : choice));
   };
 
@@ -40,22 +35,20 @@ function MatchingQuestionAnswer({ question, questionIndex, onAnswerChange, answe
     if (isCompleted || !selectedChoice) return;
 
     const newAnswers = [...userAnswers];
-    // If the slot is already filled, clear it first
     newAnswers[slotIndex] = selectedChoice;
 
     onAnswerChange(questionIndex, newAnswers);
-    setSelectedChoice(null); // Deselect choice after placing it
+    setSelectedChoice(null); 
   };
 
   const handleRemoveAnswer = (slotIndex) => {
     if (isCompleted) return;
 
     const newAnswers = [...userAnswers];
-    newAnswers[slotIndex] = null; // Clear the slot
+    newAnswers[slotIndex] = null; 
     onAnswerChange(questionIndex, newAnswers);
   };
 
-  // Choices that are not yet placed in an answer slot
   const availableChoices = correctChoices.filter(choice => !userAnswers.includes(choice));
 
   return (
@@ -136,11 +129,17 @@ export default function AssignmentDetails() {
   const [documentViewerVisible, setDocumentViewerVisible] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [submissionScore, setSubmissionScore] = useState(null);
-  const [viewingDocument, setViewingDocument] = useState(null); // For instructions/lessons
+  const [viewingDocument, setViewingDocument] = useState(null); 
   const [attemptCount, setAttemptCount] = useState(0);
   const [viewingResults, setViewingResults] = useState(false);
   const [allowedAttempts, setAllowedAttempts] = useState(1);
   const [isGraded, setIsGraded] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(null);
+  const [hasStarted, setHasStarted] = useState(false);
+  const [activeTake, setActiveTake] = useState(null);
+  const timerRef = React.useRef(null);
+  const [showContinueScreen, setShowContinueScreen] = useState(false);
+  const [showChoiceScreen, setShowChoiceScreen] = useState(false);
 
   useEffect(() => {
     if (!assessmentId || !assignedAssessmentId) {
@@ -156,6 +155,10 @@ export default function AssignmentDetails() {
       }
     };
     initialize();
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
   }, [assessmentId, assignedAssessmentId]);
 
   const closeDocumentViewer = () => {
@@ -195,7 +198,7 @@ export default function AssignmentDetails() {
       }
 
       const { data: assigned, error: assignedError } = await supabase
-        .from('assigned_assessments') // Fetch allowed_attempts here
+        .from('assigned_assessments') 
         .select('*')
         .eq('id', assignedAssessmentId)
         .single();
@@ -211,7 +214,7 @@ export default function AssignmentDetails() {
       setAllowedAttempts(assigned.allowed_attempts || 1);
 
       // Now that we have assignedData, check completion status
-      await checkAssignmentCompletion(currentUser, assigned); // Pass both user and the newly fetched assigned data
+      await checkAssignmentStatus(currentUser, assigned); // Pass both user and the newly fetched assigned data
     } catch (err) {
       console.error('Error fetching assignment data:', err);
       setError('Failed to load assignment data: ' + err.message);
@@ -220,56 +223,166 @@ export default function AssignmentDetails() {
     }
   };
 
-  const checkAssignmentCompletion = async (currentUser, fetchedAssignedData) => {
+  const checkAssignmentStatus = async (currentUser, fetchedAssignedData) => {
     try {
       if (!currentUser || !currentUser.id || !assignedAssessmentId) return;
 
-      // Use the freshly fetched assigned data if available, otherwise use state
       const currentAssignedData = fetchedAssignedData || assignedData;
       if (!currentAssignedData) {
-        console.log("checkAssignmentCompletion: assignedData not available yet.");
+        console.log("checkAssignmentStatus: assignedData not available yet.");
         return;
       }
 
       const { data: takes, error: takesError } = await supabase
         .from('student_assessments_take')
-        .select('id, score, created_at')
+        .select('id, score, created_at, started_at')
         .eq('assigned_assessments_id', assignedAssessmentId)
         .eq('users_id', currentUser.id)
         .order('created_at', { ascending: false });
 
       if (takesError) throw takesError;
 
-      setAttemptCount(takes.length);
+      const isTimed = currentAssignedData.time_limit > 0;
+      const questions = parseQuestions(assignmentData);
+      const isFileSub = questions[0]?.activityType === 'File Submission';
 
-      if (takes.length === 0) return;
+      // Filter out 'in-progress' takes for timed, non-file-submission assessments
+      const completedTakes = takes.filter(take => {
+        if (isTimed && !isFileSub && take.started_at && take.score === null) {
+          const endTime = new Date(take.started_at).getTime() + currentAssignedData.time_limit * 60 * 1000;
+          // If score is null and time is not up, it's in-progress
+          if (Date.now() < endTime) {
+            setActiveTake(take); // This is an active, unfinished attempt
+            setShowContinueScreen(true); // Show the continue/restart screen
+            return false; // Don't count it as a completed attempt yet
+          }
+        }
+        return true; // Count as a completed attempt
+      });
 
-      const latestTake = takes[0];
-      setSubmissionScore(latestTake.score);
-      // If the latest take has a score, it means it has been graded.
-      if (latestTake.score !== null) {
-        setIsGraded(true);
+      setAttemptCount(completedTakes.length);
+
+      // If there are completed takes and they can re-attempt, show choice screen.
+      if (completedTakes.length > 0 && completedTakes.length < (currentAssignedData.allowed_attempts || 1)) {
+        setShowChoiceScreen(true);
       }
 
-      const { data: answerData, error: answerError } = await supabase
-        .from('student_assessments_answer')
-        .select('answer')
-        .eq('student_assessments_take_id', latestTake.id)
-        .eq('users_id', currentUser.id);
+      // If there are any takes (completed or not), load the latest one for viewing.
+      if (takes.length > 0) {
+        const latestTake = takes[0];
+        setSubmissionScore(latestTake.score);
+        if (latestTake.score !== null) {
+          setIsGraded(true);
+        }
 
-      if (!answerError && answerData && answerData.length > 0) {
-        setIsCompleted(takes.length >= (currentAssignedData.allowed_attempts || 1));
-        setViewingResults(true); // If there's a submission, start in results view
-        setCompletedAnswers(answerData.map(a => JSON.parse(a.answer)));
-        const completedAnswersObj = {};
-        answerData.forEach(a => {
-          const parsedAnswer = JSON.parse(a.answer);
-          completedAnswersObj[parsedAnswer.questionIndex] = parsedAnswer.answer;
-        });
-        setAnswers(completedAnswersObj);
+        const { data: answerData, error: answerError } = await supabase
+          .from('student_assessments_answer')
+          .select('answer')
+          .eq('student_assessments_take_id', latestTake.id)
+          .eq('users_id', currentUser.id);
+
+        if (!answerError && answerData && answerData.length > 0) {
+          setIsCompleted(takes.length >= (currentAssignedData.allowed_attempts || 1));
+          setCompletedAnswers(answerData.map(a => JSON.parse(a.answer)));
+          const completedAnswersObj = {};
+          answerData.forEach(a => {
+            const parsedAnswer = JSON.parse(a.answer);
+            completedAnswersObj[parsedAnswer.questionIndex] = parsedAnswer.answer;
+          });
+          setAnswers(completedAnswersObj);
+          // Only go to results view if there are no more attempts or no choice screen
+          if (completedTakes.length >= (currentAssignedData.allowed_attempts || 1)) {
+            setViewingResults(true);
+          }
+        }
       }
     } catch (error) {
       console.error('Error checking assignment completion:', error);
+    }
+  };
+
+  const parseQuestions = (data = assignmentData) => {
+    if (!data?.questions) return [];
+    try {
+      return typeof data.questions === 'string' 
+        ? JSON.parse(data.questions) 
+        : data.questions;
+    } catch (error) {
+      console.error('Error parsing questions:', error);
+      return [];
+    }
+  };
+
+  const startTimer = (startTime, timeLimitMinutes) => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    
+    const endTime = new Date(startTime).getTime() + timeLimitMinutes * 60 * 1000;
+
+    timerRef.current = setInterval(() => {
+      const now = Date.now();
+      const remaining = endTime - now;
+
+      if (remaining <= 0) {
+        clearInterval(timerRef.current);
+        setTimeLeft(0);
+        Alert.alert("Time's Up!", "Your time has expired. Your answers will be submitted automatically.", [
+          { text: "OK", onPress: () => handleSubmit() }
+        ]);
+      } else {
+        setTimeLeft(remaining);
+      }
+    }, 1000);
+  };
+
+  useEffect(() => {
+    const questions = parseQuestions();
+    const isFileSub = questions[0]?.activityType === 'File Submission';
+    const isTimed = assignedData?.time_limit > 0 && !isFileSub;
+
+    if (isTimed && !viewingResults && attemptCount < allowedAttempts) {
+      if (activeTake?.started_at) {
+        // An active attempt is already in progress, start the timer immediately
+        setHasStarted(true);
+        startTimer(activeTake.started_at, assignedData.time_limit);
+      } else if (hasStarted) {
+        // This is a new attempt being started
+        // The startTake function will handle timer creation
+      }
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [assignedData, viewingResults, assignmentData, hasStarted, activeTake]);
+
+  const startNewTimedAttempt = async () => {
+    if (!user || !assignedData) return;
+
+    try {
+      const startTime = new Date().toISOString();
+      const { data: newTake, error: takeError } = await supabase
+        .from('student_assessments_take')
+        .insert({
+          assigned_assessments_id: assignedData.id,
+          users_id: user.id,
+          started_at: startTime,
+          // Score is initially null
+        })
+        .select()
+        .single();
+
+      if (takeError) throw takeError;
+
+      setActiveTake(newTake);
+      setHasStarted(true);
+      startTimer(startTime, assignedData.time_limit);
+
+    } catch (error) {
+      console.error('Error starting new timed attempt:', error);
+      Alert.alert('Error', 'Could not start the assignment. Please try again.');
+      router.back();
     }
   };
 
@@ -322,7 +435,7 @@ export default function AssignmentDetails() {
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (isAutoSubmit = false) => {
     if (!user || !assignmentData || !assignedData) {
       Alert.alert('Error', 'Missing required data to submit.');
       return;
@@ -334,39 +447,45 @@ export default function AssignmentDetails() {
     }
 
     const questions = parseQuestions();
-    const unansweredQuestions = questions.filter((_, index) => {
-      const answer = answers[index];
-      const question = questions[index]; // Get the actual question object
+    // Only check for unanswered questions if it's not an auto-submission
+    if (!isAutoSubmit) {
+      const unansweredQuestions = questions.filter((_, index) => {
+        const answer = answers[index];
+        const question = questions[index]; // Get the actual question object
 
-      if (question.activityType === 'File Submission') {
-        // For file submission, an answer is valid if there's at least one file uploaded
-        return !answer || !Array.isArray(answer) || answer.length === 0;
-      } else {
-        if (!answer) return true;
-        if (Array.isArray(answer)) return answer.some(a => !a || (typeof a === 'string' && a.trim() === ''));
-        return answer.toString().trim() === '';
+        if (question.activityType === 'File Submission') {
+          // For file submission, an answer is valid if there's at least one file uploaded
+          return !answer || !Array.isArray(answer) || answer.length === 0;
+        } else {
+          if (!answer) return true;
+          if (Array.isArray(answer)) return answer.some(a => !a || (typeof a === 'string' && a.trim() === ''));
+          return answer.toString().trim() === '';
+        }
+      });
+
+      if (unansweredQuestions.length > 0) {
+        Alert.alert('Incomplete', 'Please provide an answer for all parts of the assignment before submitting.');
+        return;
       }
-    });
-
-    if (unansweredQuestions.length > 0) {
-      Alert.alert('Incomplete', 'Please provide an answer for all parts of the assignment before submitting.');
-      return;
     }
 
     setIsSubmitting(true);
     try {
-      const { data: takeData, error: takeError } = await supabase
-        .from('student_assessments_take')
-        .insert({
-          assigned_assessments_id: assignedData.id,
-          created_at: new Date().toISOString(),
-          users_id: user.id
-        })
-        .select()
-        .single();
+      let takeId = activeTake?.id;
 
-      if (takeError) throw takeError;
-
+      // If it's not a timed quiz or no active take, create one now.
+      if (!takeId) {
+        const { data: newTake, error: takeError } = await supabase
+          .from('student_assessments_take')
+          .insert({
+            assigned_assessments_id: assignedData.id,
+            users_id: user.id,
+          })
+          .select('id').single();
+        if (takeError) throw takeError;
+        takeId = newTake.id;
+      }
+      
       const isFileSubmissionOnly = questions.length === 1 && questions[0].activityType === 'File Submission';
       let answerPromises;
 
@@ -375,7 +494,7 @@ export default function AssignmentDetails() {
         const fileAnswer = answers[0];
         answerPromises = [
           supabase.from('student_assessments_answer').insert({
-            student_assessments_take_id: takeData.id.toString(),
+            student_assessments_take_id: takeId,
             users_id: user.id,
             answer: JSON.stringify({ questionIndex: 0, answer: fileAnswer })
           })
@@ -384,7 +503,7 @@ export default function AssignmentDetails() {
         // For other or mixed types, loop through all answers
         answerPromises = Object.entries(answers).map(([questionIndex, answer]) => {
           return supabase.from('student_assessments_answer').insert({
-            student_assessments_take_id: takeData.id.toString(),
+            student_assessments_take_id: takeId,
             users_id: user.id,
             answer: JSON.stringify({ questionIndex: parseInt(questionIndex), answer: answer })
           });
@@ -395,6 +514,21 @@ export default function AssignmentDetails() {
       const hasAnswerError = answerResults.some(result => result.error);
 
       if (hasAnswerError) throw new Error('Failed to save one or more answers.');
+
+      // After saving answers, update the take with the score if auto-gradable
+      const autoGradableQuestions = questions.filter(q => q.activityType !== 'File Submission');
+      let finalScore = null;
+      if (autoGradableQuestions.length > 0) {
+        const correctAnswersCount = autoGradableQuestions.filter((q, i) => isAnswerCorrect(q, i, answers[i])).length;
+        finalScore = correctAnswersCount; // Or calculate based on points
+      }
+
+      const { error: updateTakeError } = await supabase
+        .from('student_assessments_take')
+        .update({ score: finalScore, created_at: new Date().toISOString() }) // created_at now acts as submitted_at
+        .eq('id', takeId);
+
+      if (updateTakeError) throw updateTakeError;
 
       // For file submissions, also create an entry in the 'submissions' table.
       // This is used by the TeacherDashboard for "Waiting for grade" notifications.
@@ -410,16 +544,14 @@ export default function AssignmentDetails() {
 
       if (submissionInsertError) {
         console.error('Error inserting into submissions table:', submissionInsertError);
-        throw submissionInsertError; // Re-throw to indicate submission failure
+        throw submissionInsertError; 
       }
 
-      // Check if there are any auto-gradable questions
-      const autoGradableQuestions = questions.filter(q => q.activityType !== 'File Submission');
       let message = "Your submission has been received and is waiting for grading.";
 
       if (autoGradableQuestions.length > 0) {
         const correctAnswersCount = autoGradableQuestions.filter((q, i) => isAnswerCorrect(q, i, answers[i])).length;
-        const totalAutoGradable = autoGradableQuestions.length;
+        const totalAutoGradable = autoGradableQuestions.length; // This is the score for now
         message = `You scored ${correctAnswersCount}/${totalAutoGradable} on the auto-graded items. The rest of your submission is waiting for grading.`;
       }
       
@@ -428,14 +560,13 @@ export default function AssignmentDetails() {
       setIsCompleted(newAttemptCount >= allowedAttempts);
       setViewingResults(true);
 
-      // Update the completedAnswers state locally to immediately show the submitted answers
       const submittedAnswersForReview = Object.entries(answers).map(([qIndex, ans]) => ({
         questionIndex: parseInt(qIndex),
         answer: ans,
       }));
       setCompletedAnswers(submittedAnswersForReview);
 
-      setSubmissionScore(null); // Initially null until graded
+      setSubmissionScore(finalScore); 
 
       Alert.alert("Submission Successful!", message, [
         { text: "Review Answers" },
@@ -458,10 +589,10 @@ export default function AssignmentDetails() {
           'application/pdf', 
           'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 
           'text/x-java-source',
-          '*/*' // Fallback to allow any file type to be selected
+          '*/*' 
         ],
         copyToCacheDirectory: true,
-        multiple: true, // Allow multiple files to be selected
+        multiple: true, 
       });
   
       if (result.canceled) return;
@@ -478,12 +609,12 @@ export default function AssignmentDetails() {
   
         if (!allowedTypes.includes(fileExtension)) {
           Alert.alert('Invalid File Type', `File "${file.name}" has an unsupported type. Only .pdf, .docx, or .java are allowed.`);
-          continue; // Skip this file
+          continue; 
         }
   
         if (file.size > MAX_SIZE_MB * 1024 * 1024) {
           Alert.alert('File Too Large', `File "${file.name}" exceeds the ${MAX_SIZE_MB}MB limit.`);
-          continue; // Skip this file
+          continue;
         }
   
         newFilesToUpload.push(file);
@@ -511,7 +642,6 @@ export default function AssignmentDetails() {
   
       const uploadedFiles = await Promise.all(uploadPromises);
       
-      // Append new files to existing ones
       handleAnswerChange([...currentFiles, ...uploadedFiles]);
   
       Alert.alert('Success', `${uploadedFiles.length} file(s) uploaded successfully.`);
@@ -551,18 +681,20 @@ export default function AssignmentDetails() {
   }
 };
 
-
-
-  const parseQuestions = () => {
-    if (!assignmentData?.questions) return [];
-    try {
-      return typeof assignmentData.questions === 'string' 
-        ? JSON.parse(assignmentData.questions) 
-        : assignmentData.questions;
-    } catch (error) {
-      console.error('Error parsing questions:', error);
-      return [];
-    }
+  const handleRestartFromContinue = () => {
+    Alert.alert(
+      "Restart Attempt?",
+      "This will discard your current in-progress attempt and start a new one. This will use one of your available attempts. Are you sure?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Yes, Restart", onPress: () => {
+            setShowContinueScreen(false);
+            setAnswers({});
+            setCurrentQuestionIndex(0);
+            setHasStarted(false); // Reset to show start screen for new attempt
+        }}
+      ]
+    )
   };
 
   const handleReattempt = () => {
@@ -583,6 +715,7 @@ export default function AssignmentDetails() {
             setViewingResults(false);
             setAnswers({});
             setCurrentQuestionIndex(0);
+            setHasStarted(false); // This will trigger the start confirmation screen again
         }}
       ]
     )
@@ -630,6 +763,78 @@ export default function AssignmentDetails() {
   const currentQuestion = questions[currentQuestionIndex];
   const hasAutoGradableQuestions = questions.some(q => q.activityType !== 'File Submission');
   const deadlinePassed = isDeadlinePassed();
+  const isTimed = assignedData.time_limit > 0 && questions[0]?.activityType !== 'File Submission';
+
+  if (showChoiceScreen) {
+    return (
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={styles.centered}>
+          <View style={styles.startCard}>
+            <Text style={styles.startTitle}>You have {allowedAttempts - attemptCount} attempt(s) remaining.</Text>
+            <TouchableOpacity style={styles.startButton} onPress={() => {
+              setShowChoiceScreen(false);
+              setViewingResults(true);
+            }}>
+              <Text style={styles.startButtonText}>View Last Attempt</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.startCancelButton} onPress={handleReattempt}>
+              <Text style={styles.startCancelButtonText}>Start New Attempt</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </>
+    );
+  }
+
+  if (showContinueScreen) {
+    return (
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={styles.centered}>
+          <View style={styles.startCard}>
+            <Text style={styles.startTitle}>Attempt in Progress</Text>
+            <Text style={styles.startDescription}>
+              You have an unfinished attempt for this assignment.
+            </Text>
+            <TouchableOpacity style={styles.startButton} onPress={() => {
+              setShowContinueScreen(false);
+              setHasStarted(true);
+              startTimer(activeTake.started_at, assignedData.time_limit);
+            }}>
+              <Text style={styles.startButtonText}>Continue Attempt</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.startCancelButton} onPress={handleRestartFromContinue}>
+              <Text style={styles.startCancelButtonText}>Restart (New Attempt)</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </>
+    );
+  }
+
+  if (isTimed && !hasStarted && !viewingResults && attemptCount < allowedAttempts) {
+    return (
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={styles.centered}>
+          <View style={styles.startCard}>
+            <Text style={styles.startTitle}>Start Timed Assignment?</Text>
+            <Text style={styles.startDescription}>
+              This assignment has a time limit of <Text style={{fontWeight: 'bold'}}>{assignedData.time_limit} minutes</Text>. 
+              The timer will begin as soon as you start.
+            </Text>
+            <TouchableOpacity style={styles.startButton} onPress={startNewTimedAttempt}>
+              <Text style={styles.startButtonText}>Start Assignment</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.startCancelButton} onPress={() => router.back()}>
+              <Text style={styles.startCancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </>
+    );
+  }
 
   return (
     <>
@@ -681,6 +886,20 @@ export default function AssignmentDetails() {
             </Text>
 
           </View>
+
+          {timeLeft !== null && !viewingResults && (
+            <View style={{ 
+              marginTop: 15, 
+              padding: 10, 
+              backgroundColor: timeLeft < 60000 ? '#FFEBEE' : '#E3F2FD', 
+              borderRadius: 8, 
+              alignItems: 'center' 
+            }}>
+              <Text style={{ fontSize: 16, fontWeight: 'bold', color: timeLeft < 60000 ? '#D32F2F' : '#1E88E5' }}>
+                Time Left: {Math.floor(timeLeft / 60000)}:{(Math.floor(timeLeft / 1000) % 60).toString().padStart(2, '0')}
+              </Text>
+            </View>
+          )}
           
           {viewingResults && hasAutoGradableQuestions && (
             <View style={styles.completedInfoBox}>
@@ -856,7 +1075,7 @@ export default function AssignmentDetails() {
                 {currentQuestion.instructionFileUrl && (
                   <TouchableOpacity
                     style={styles.viewPdfButton}
-                    onPress={() => { // Disable speech for instructions
+                    onPress={() => { 
                       setViewingDocument({
                         url: currentQuestion.instructionFileUrl,
                         title: 'Instructions',
@@ -870,7 +1089,7 @@ export default function AssignmentDetails() {
                   </TouchableOpacity>
                 )}
                 <View>
-                  {viewingResults ? ( // When viewing results of a submission
+                  {viewingResults ? ( 
                     <View>
                       {/* List of submitted files */}
                       {(completedAnswers.find(a => a.questionIndex === currentQuestionIndex)?.answer || []).map((file, index) => (
@@ -892,15 +1111,15 @@ export default function AssignmentDetails() {
                         <View style={styles.gradeBox}>
                           <Text style={styles.gradeLabel}>Graded</Text>
                         </View>
-                      ) : hasAutoGradableQuestions ? null : ( // Show "Waiting for grading" only if it's purely file submission
+                      ) : hasAutoGradableQuestions ? null : ( 
                         <View style={styles.waitingGradeBox}>
                           <Text style={styles.waitingGradeText}>Waiting for grading</Text>
                         </View>
                       )}
                     </View>
-                  ) : ( // When user is actively answering/uploading
+                  ) : ( 
                     <> 
-                      {(answers[currentQuestionIndex] || []).map((file, index) => ( // This part is for when user is actively uploading before first submission
+                      {(answers[currentQuestionIndex] || []).map((file, index) => ( 
                         <View key={index} style={styles.fileSubmissionContainer}>
                           <MaterialCommunityIcons name="file-document-outline" size={24} color="#046a38" />
                           <Text style={[styles.fileSubmissionText, {color: '#046a38'}]} numberOfLines={1}>
@@ -964,7 +1183,7 @@ export default function AssignmentDetails() {
                 if (questions[0].activityType === 'File Submission' && questions[0].maxScore !== undefined) {
                   totalPossibleScore = questions[0].maxScore;
                 } else {
-                  totalPossibleScore = questions.length; // Default to 1 point per question for auto-graded
+                  totalPossibleScore = questions.length; 
                 }
               }
 
@@ -1164,5 +1383,14 @@ const styles = StyleSheet.create({
   gradeValue: { color: '#1B5E20', fontWeight: 'bold', fontSize: 18, marginLeft: 8 },
   waitingGradeBoxSummary: { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#CE93D8', alignItems: 'center' },
   waitingGradeTextSummary: { fontSize: 16, color: '#7B1FA2', fontStyle: 'italic' },
+
+  // Start Screen Styles
+  startCard: { backgroundColor: '#fff', padding: 30, borderRadius: 15, margin: 20, alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 },
+  startTitle: { fontSize: 22, fontWeight: 'bold', color: '#046a38', marginBottom: 15, textAlign: 'center' },
+  startDescription: { fontSize: 16, color: '#555', textAlign: 'center', marginBottom: 20, lineHeight: 24 },
+  startButton: { backgroundColor: '#046a38', paddingVertical: 15, paddingHorizontal: 40, borderRadius: 10, marginBottom: 10, width: '100%' },
+  startButtonText: { color: '#fff', fontSize: 18, fontWeight: '600', textAlign: 'center' },
+  startCancelButton: { paddingVertical: 12, paddingHorizontal: 40, borderRadius: 10, width: '100%' },
+  startCancelButtonText: { color: '#666', fontSize: 16, fontWeight: '500', textAlign: 'center' },
 
 });

@@ -90,19 +90,15 @@ export default StyleSheet.create({
         color: "#333" 
     },
     assignmentItem: { 
-        backgroundColor: "#fff", 
-        padding: 15, 
+        backgroundColor: "#f9f9f9", 
+        padding: 16, 
         borderRadius: 8, 
         marginVertical: 8, 
         borderWidth: 1, 
-        borderColor: "#046a38",
+        borderColor: "#e0e0e0",
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
-        shadowColor: "#000",
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 2,
     },
     assignmentContent: {
         flex: 1,
@@ -111,13 +107,14 @@ export default StyleSheet.create({
         fontSize: 16,
         fontWeight: "bold",
         color: "#046a38",
-        marginBottom: 5,
+        flex: 1, // Allow title to take available space
+        marginRight: 8, // Add space between title and time limit
     },
     assignmentDescription: {
         fontSize: 14,
         color: "#666",
-        marginBottom: 8,
-        lineHeight: 18,
+        marginBottom: 12,
+        lineHeight: 20,
     },
     assignmentMeta: {
         flexDirection: "row",
@@ -170,12 +167,12 @@ export default StyleSheet.create({
         fontWeight: "bold" 
     },
     quizItem: { 
-        backgroundColor: "#fff", 
-        padding: 15, 
+        backgroundColor: "#f9f9f9", 
+        padding: 16, 
         borderRadius: 8, 
         marginVertical: 8, 
         borderWidth: 1, 
-        borderColor: "#046a38",
+        borderColor: "#e0e0e0",
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between"
@@ -185,19 +182,23 @@ export default StyleSheet.create({
         marginRight: 10
     },
     quizTitle: {
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: "bold",
         color: "#046a38",
-        marginBottom: 5
+        flex: 1, // Allow title to take available space
+        marginRight: 8, // Add space between title and time limit
     },
     quizDescription: {
         fontSize: 14,
         color: "#666",
-        marginBottom: 8
+        marginBottom: 12,
+        lineHeight: 20,
     },
     quizMeta: {
         flexDirection: "row",
-        justifyContent: "space-between"
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: 16,
     },
     quizDeadline: {
         fontSize: 12,
@@ -222,6 +223,50 @@ export default StyleSheet.create({
         textAlign: "center",
         lineHeight: 24,
     },
+    titleRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: 4,
+    },
+    timeLimitContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#e9ecef',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+        marginLeft: 10,
+    },
+    timeLimitText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#495057',
+        marginLeft: 4,
+    },
+    metaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: 16,
+    },
+    metaItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    metaText: {
+        fontSize: 12,
+        color: '#495057',
+        marginLeft: 5,
+        fontWeight: '500',
+    },
+    metaSeparator: {
+        fontSize: 12,
+        color: '#adb5bd',
+        marginHorizontal: -8,
+    },
+
+
     subtitle: { 
         fontSize: 16, 
         fontWeight: "bold", 

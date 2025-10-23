@@ -129,6 +129,12 @@ const QuizDetails = () => {
   const [attemptCount, setAttemptCount] = useState(0);
   const [viewingResults, setViewingResults] = useState(false);
   const [allowedAttempts, setAllowedAttempts] = useState(1);
+  const [timeLeft, setTimeLeft] = useState(null);
+  const timerRef = React.useRef(null);
+  const [hasStarted, setHasStarted] = useState(false);
+  const [activeTake, setActiveTake] = useState(null);
+  const [showContinueScreen, setShowContinueScreen] = useState(false);
+  const [showChoiceScreen, setShowChoiceScreen] = useState(false);
 
   useEffect(() => {
     if (!assessmentId || !assignedAssessmentId) {
@@ -139,10 +145,17 @@ const QuizDetails = () => {
     
     const initialize = async () => {
       const userData = await getUserData();
-      await fetchQuizData();
-      await checkQuizCompletion(userData);
+      if (userData) {
+        // Fetch quiz data first, then check status which depends on it
+        const fetchedData = await fetchQuizData();
+        if (fetchedData) await checkQuizStatus(userData, fetchedData.assignedData);
+      }
     };
     initialize();
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
   }, [assessmentId, assignedAssessmentId]);
 
   const getUserData = async () => {
@@ -158,53 +171,77 @@ const QuizDetails = () => {
     }
   };
 
-  const checkQuizCompletion = async (currentUser, fetchedAssignedData) => {
+  const checkQuizStatus = async (currentUser, fetchedAssignedData) => {
     try {
       if (!currentUser || !currentUser.id || !assignedAssessmentId) return;
   
-      // Use the freshly fetched assigned data if available, otherwise use state
       const currentAssignedData = fetchedAssignedData || assignedData;
       if (!currentAssignedData) {
-        console.log("checkQuizCompletion: assignedData not available yet.");
+        console.log("checkQuizStatus: assignedData not available yet.");
         return;
       }
 
       const { data: takes, error: takesError } = await supabase
         .from('student_assessments_take')
-        .select('id, created_at')
+        .select('id, created_at, started_at, score')
         .eq('assigned_assessments_id', assignedAssessmentId)
         .eq('users_id', currentUser.id)
         .order('created_at', { ascending: false });
   
       if (takesError) throw takesError;
-  
-      setAttemptCount(takes.length);
-  
-      if (takes.length === 0) return;
-  
-      const latestTake = takes[0];
-      const { data: answerData, error: answerError } = await supabase
-        .from('student_assessments_answer')
-        .select('answer')
-        .eq('student_assessments_take_id', latestTake.id)
-        .eq('users_id', currentUser.id);
-      if (!answerError && answerData && answerData.length > 0) {
-        setIsCompleted(takes.length >= (currentAssignedData.allowed_attempts || 1));
-        setViewingResults(true); // If there's a submission, start in results view
-        setCompletedAnswers(answerData.map(a => JSON.parse(a.answer)));
-        const completedAnswersObj = {};
-        answerData.forEach(a => {
-          const parsedAnswer = JSON.parse(a.answer);
-          completedAnswersObj[parsedAnswer.questionIndex] = parsedAnswer.answer;
-        });
-        setAnswers(completedAnswersObj);
+
+      const isTimed = currentAssignedData.time_limit > 0;
+
+      // Filter out 'in-progress' takes for timed quizzes
+      const completedTakes = takes.filter(take => {
+        if (isTimed && take.started_at && take.score === null) {
+          const endTime = new Date(take.started_at).getTime() + currentAssignedData.time_limit * 60 * 1000;
+          // If score is null and time is not up, it's in-progress
+          if (Date.now() < endTime) {
+            setActiveTake(take); // This is an active, unfinished attempt
+            setShowContinueScreen(true); // Show the continue/restart screen
+            return false; // Don't count it as a completed attempt yet
+          }
+        }
+        return true; // Count as a completed attempt
+      });
+
+      setAttemptCount(completedTakes.length);
+
+      // If there are completed takes and they can re-attempt, show choice screen.
+      if (completedTakes.length > 0 && completedTakes.length < (currentAssignedData.allowed_attempts || 1)) {
+        setShowChoiceScreen(true);
+      }
+
+      // If there are any takes (completed or not), load the latest one for viewing.
+      if (takes.length > 0) {
+        const latestTake = takes[0];
+        const { data: answerData, error: answerError } = await supabase
+          .from('student_assessments_answer')
+          .select('answer')
+          .eq('student_assessments_take_id', latestTake.id)
+          .eq('users_id', currentUser.id);
+        if (!answerError && answerData && answerData.length > 0) {
+          setIsCompleted(takes.length >= (currentAssignedData.allowed_attempts || 1));
+          setCompletedAnswers(answerData.map(a => JSON.parse(a.answer)));
+          const completedAnswersObj = {};
+          answerData.forEach(a => {
+            const parsedAnswer = JSON.parse(a.answer);
+            completedAnswersObj[parsedAnswer.questionIndex] = parsedAnswer.answer;
+          });
+          setAnswers(completedAnswersObj);
+          // Only go to results view if there are no more attempts or no choice screen
+          if (completedTakes.length >= (currentAssignedData.allowed_attempts || 1)) {
+            setViewingResults(true);
+          }
+        }
       }
     } catch (error) {
-      console.error('Error checking quiz completion:', error);
+      console.error('Error checking quiz status:', error);
     }
   };
 
-  const fetchQuizData = async (currentUser) => {
+  const fetchQuizData = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -217,54 +254,127 @@ const QuizDetails = () => {
 
       if (assessmentError) {
         console.error('Error fetching assessment:', assessmentError);
-        setError('Failed to load assessment data: ' + assessmentError.message);
-        return;
+        throw assessmentError;
       }
 
       if (!assessmentData) {
         setError('Assessment not found');
-        return;
+        return null;
       }
 
-      const { data: assignedData, error: assignedError } = await supabase
+      const { data: fetchedAssignedData, error: assignedError } = await supabase
         .from('assigned_assessments')
         .select('*')
         .eq('id', assignedAssessmentId)
         .single();
 
       if (assignedError) {
-        console.error('Error fetching assigned assessment:', assignedError);
-        setError('Failed to load assignment data: ' + assignedError.message);
-        return;
+        throw assignedError;
       }
 
-      if (!assignedData) {
+      if (!fetchedAssignedData) {
         setError('Assignment not found');
-        return;
+        return null;
       }
 
       setQuizData(assessmentData);
-      setAssignedData(assignedData);
-      setAllowedAttempts(assignedData.allowed_attempts || 1);
-
-      // Now that we have assignedData, check completion status
-      await checkQuizCompletion(currentUser, assignedData);
-      
+      setAssignedData(fetchedAssignedData);
+      setAllowedAttempts(fetchedAssignedData.allowed_attempts || 1);
+      return { assessmentData, assignedData: fetchedAssignedData };
     } catch (error) {
       console.error('Error fetching quiz data:', error);
       setError('Failed to load quiz data: ' + error.message);
+      return null;
     } finally {
       setLoading(false);
     }
   };
 
+  const startTimer = (startTime, timeLimitMinutes) => {
+    if (timerRef.current) clearInterval(timerRef.current);
+
+    const endTime = new Date(startTime).getTime() + timeLimitMinutes * 60 * 1000;
+
+    timerRef.current = setInterval(() => {
+      const now = Date.now();
+      const remaining = endTime - now;
+
+      if (remaining <= 0) {
+        clearInterval(timerRef.current);
+        setTimeLeft(0);
+        Alert.alert("Time's Up!", "Your time for this quiz has expired. Your answers will be submitted automatically.", [
+          { text: "OK", onPress: () => submitQuiz(true) } // Pass true to indicate auto-submission
+        ]);
+      } else {
+        setTimeLeft(remaining);
+      }
+    }, 1000);
+  };
+
   useEffect(() => {
-    if (user) {
-      fetchQuizData(user);
+    const isTimed = assignedData?.time_limit > 0;
+
+    if (isTimed && !viewingResults && attemptCount < allowedAttempts) {
+      if (activeTake?.started_at) {
+        // An active attempt is already in progress, start the timer immediately
+        setHasStarted(true);
+        startTimer(activeTake.started_at, assignedData.time_limit);
+      } else if (hasStarted) {
+        // This is a new attempt being started, handled by startNewTimedAttempt
+      }
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
     }
-  }, [user, assessmentId, assignedAssessmentId]);
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [assignedData, viewingResults, hasStarted, activeTake]);
+
+  const startNewTimedAttempt = async () => {
+    if (!user || !assignedData) return;
+
+    try {
+      const startTime = new Date().toISOString();
+      const { data: newTake, error: takeError } = await supabase
+        .from('student_assessments_take')
+        .insert({
+          assigned_assessments_id: assignedData.id,
+          users_id: user.id,
+          started_at: startTime,
+          // Score is initially null
+        })
+        .select()
+        .single();
+
+      if (takeError) throw takeError;
+
+      setActiveTake(newTake);
+      setHasStarted(true);
+      startTimer(startTime, assignedData.time_limit);
+    } catch (error) {
+      console.error('Error starting new timed attempt:', error);
+      Alert.alert('Error', 'Could not start the quiz. Please try again.');
+      router.back();
+    }
+  };
   
-  const submitQuiz = async () => {
+  const handleRestartAttempt = () => {
+    Alert.alert(
+      "Restart Attempt?",
+      "This will discard your current in-progress attempt and start a new one. This will use one of your available attempts. Are you sure?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Yes, Restart", onPress: () => {
+            setShowContinueScreen(false);
+            setAnswers({});
+            setCurrentQuestionIndex(0);
+            setHasStarted(false); // Reset to show start screen for new attempt
+        }}
+      ]
+    )
+  };
+  const submitQuiz = async (isAutoSubmit = false) => {
     if (!user || !quizData || !assignedData) {
       Alert.alert('Error', 'Missing required data');
       return;
@@ -276,44 +386,42 @@ const QuizDetails = () => {
     }
 
     const questions = parseQuestions();
-    const unansweredQuestions = questions.filter((_, index) => {
-      const answer = answers[index];
-      if (!answer) return true;
-      if (Array.isArray(answer)) { // For matching questions
-        return answer.some(a => !a || (typeof a === 'string' && a.trim() === ''));
-      }
-      return answer.toString().trim() === '';
-    });
+    // Only check for unanswered questions if it's not an auto-submission
+    if (!isAutoSubmit) {
+      const unansweredQuestions = questions.filter((_, index) => {
+        const answer = answers[index];
+        if (!answer) return true;
+        if (Array.isArray(answer)) { // For matching questions
+          return answer.some(a => !a || (typeof a === 'string' && a.trim() === ''));
+        }
+        return answer.toString().trim() === '';
+      });
 
-    if (unansweredQuestions.length > 0) {
-      Alert.alert('Incomplete', 'Please answer all questions before submitting.');
-      return;
+      if (unansweredQuestions.length > 0) {
+        Alert.alert('Incomplete', 'Please answer all questions before submitting.');
+        return;
+      }
     }
 
     setIsSubmitting(true);
 
     try {
-      const { data: takeData, error: takeError } = await supabase
-        .from('student_assessments_take')
-        .insert({
-          assigned_assessments_id: assignedData.id,
-          created_at: new Date().toISOString(),
-          users_id: user.id
-        })
-        .select()
-        .single();
+      let takeId = activeTake?.id;
 
-      if (takeError) {
-        console.error('Error creating take record:', takeError);
-        Alert.alert('Error', 'Failed to submit quiz. Please try again.');
-        return;
+      if (!takeId) {
+        const { data: newTake, error: takeError } = await supabase
+          .from('student_assessments_take')
+          .insert({ assigned_assessments_id: assignedData.id, users_id: user.id })
+          .select('id').single();
+        if (takeError) throw takeError;
+        takeId = newTake.id;
       }
 
       const answerPromises = Object.entries(answers).map(([questionIndex, answer]) => {
         return supabase
           .from('student_assessments_answer')
           .insert({
-            student_assessments_take_id: takeData.id.toString(),
+            student_assessments_take_id: takeId,
             users_id: user.id,
             answer: JSON.stringify({
               questionIndex: parseInt(questionIndex),
@@ -337,10 +445,40 @@ const QuizDetails = () => {
         isAnswerCorrect(question, index, answers[index])
       ).length;
 
+      // Update the take record with the score and submission time
+      const { error: updateTakeError } = await supabase
+        .from('student_assessments_take')
+        .update({ 
+          score: correctAnswersCount, 
+          created_at: new Date().toISOString() // created_at now acts as submitted_at
+        })
+        .eq('id', takeId);
+
+      if (updateTakeError) throw updateTakeError;
+
+      // Re-fetch takes to accurately calculate the new attempt count, same as checkQuizStatus
+      const { data: allTakes, error: takesError } = await supabase
+        .from('student_assessments_take')
+        .select('id, created_at, started_at, score')
+        .eq('assigned_assessments_id', assignedAssessmentId)
+        .eq('users_id', user.id);
+
+      if (takesError) throw takesError;
+
+      const isTimed = assignedData.time_limit > 0;
+      const completedTakes = allTakes.filter(take => {
+        if (isTimed && take.started_at && take.score === null) {
+          const endTime = new Date(take.started_at).getTime() + assignedData.time_limit * 60 * 1000;
+          // Only count it if the time is up
+          return Date.now() >= endTime;
+        }
+        return true; // Always count non-timed or already scored takes
+      });
+
       // Update state to show completion UI
-      const newAttemptCount = attemptCount + 1;
-      setAttemptCount(newAttemptCount);
-      setIsCompleted(newAttemptCount >= allowedAttempts);
+      const newAttemptCount = completedTakes.length;
+      setAttemptCount(newAttemptCount); // Set the accurate count
+      setIsCompleted(newAttemptCount >= allowedAttempts); // Check against allowed attempts
       setViewingResults(true);
 
       Alert.alert(
@@ -371,6 +509,7 @@ const QuizDetails = () => {
             setViewingResults(false);
             setAnswers({});
             setCurrentQuestionIndex(0);
+            setHasStarted(false); // Reset to show start screen for new attempt
         }}
       ]
     )
@@ -459,6 +598,77 @@ const QuizDetails = () => {
 
   const deadlinePassed = isDeadlinePassed();
   const currentQuestion = questions[currentQuestionIndex];
+
+  if (showChoiceScreen) {
+    return (
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={styles.centered}>
+          <View style={styles.startCard}>
+            <Text style={styles.startTitle}>You have {allowedAttempts - attemptCount} attempt(s) remaining.</Text>
+            <TouchableOpacity style={styles.startButton} onPress={() => {
+              setShowChoiceScreen(false);
+              setViewingResults(true);
+            }}>
+              <Text style={styles.startButtonText}>View Last Attempt</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.startCancelButton} onPress={handleReattempt}>
+              <Text style={styles.startCancelButtonText}>Start New Attempt</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </>
+    );
+  }
+
+  if (showContinueScreen) {
+    return (
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={styles.centered}>
+          <View style={styles.startCard}>
+            <Text style={styles.startTitle}>Attempt in Progress</Text>
+            <Text style={styles.startDescription}>
+              You have an unfinished attempt for this quiz.
+            </Text>
+            <TouchableOpacity style={styles.startButton} onPress={() => {
+              setShowContinueScreen(false);
+              setHasStarted(true);
+              startTimer(activeTake.started_at, assignedData.time_limit);
+            }}>
+              <Text style={styles.startButtonText}>Continue Attempt</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.startCancelButton} onPress={handleRestartAttempt}>
+              <Text style={styles.startCancelButtonText}>Restart (New Attempt)</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </>
+    );
+  }
+
+  if (assignedData?.time_limit > 0 && !hasStarted && !viewingResults && attemptCount < allowedAttempts) {
+    return (
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={styles.centered}>
+          <View style={styles.startCard}>
+            <Text style={styles.startTitle}>Start Timed Quiz?</Text>
+            <Text style={styles.startDescription}>
+              This quiz has a time limit of <Text style={{fontWeight: 'bold'}}>{assignedData.time_limit} minutes</Text>. 
+              The timer will begin as soon as you start.
+            </Text>
+            <TouchableOpacity style={styles.startButton} onPress={startNewTimedAttempt}>
+              <Text style={styles.startButtonText}>Start Quiz</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.startCancelButton} onPress={() => router.back()}>
+              <Text style={styles.startCancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </>
+    );
+  }
 
   if (loading) {
     return (
@@ -623,6 +833,20 @@ const QuizDetails = () => {
             <Text style={{ fontSize: 14, color: '#666' }}>Attempts: {attemptCount} / {allowedAttempts}</Text>
           </View>
           
+          {timeLeft !== null && !viewingResults && (
+            <View style={{ 
+              marginTop: 15, 
+              padding: 10, 
+              backgroundColor: timeLeft < 60000 ? '#FFEBEE' : '#E3F2FD', 
+              borderRadius: 8, 
+              alignItems: 'center' 
+            }}>
+              <Text style={{ fontSize: 16, fontWeight: 'bold', color: timeLeft < 60000 ? '#D32F2F' : '#1E88E5' }}>
+                Time Left: {Math.floor(timeLeft / 60000)}:{(Math.floor(timeLeft / 1000) % 60).toString().padStart(2, '0')}
+              </Text>
+            </View>
+          )}
+
           {viewingResults && (
             <View style={styles.completedInfoBox}>
               <Text style={styles.completedInfoTitle}>
@@ -1029,6 +1253,16 @@ const styles = StyleSheet.create({
   usedChoice: { backgroundColor: '#e0e0e0', borderColor: '#bdbdbd', opacity: 0.6 },
   // End Matching Type Styles
   title: { fontSize: 24, fontWeight: 'bold', color: '#046a38', flex: 1 ,paddingTop:5,},
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f5f5f5' },
+
+  // Start Screen Styles
+  startCard: { backgroundColor: '#fff', padding: 30, borderRadius: 15, margin: 20, alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 },
+  startTitle: { fontSize: 22, fontWeight: 'bold', color: '#046a38', marginBottom: 15, textAlign: 'center' },
+  startDescription: { fontSize: 16, color: '#555', textAlign: 'center', marginBottom: 20, lineHeight: 24 },
+  startButton: { backgroundColor: '#046a38', paddingVertical: 15, paddingHorizontal: 40, borderRadius: 10, marginBottom: 10, width: '100%' },
+  startButtonText: { color: '#fff', fontSize: 18, fontWeight: '600', textAlign: 'center' },
+  startCancelButton: { paddingVertical: 12, paddingHorizontal: 40, borderRadius: 10, width: '100%' },
+  startCancelButtonText: { color: '#666', fontSize: 16, fontWeight: '500', textAlign: 'center' },
 });
 
 export default QuizDetails;

@@ -63,11 +63,20 @@ export default function Notifications() {
 
       if (error) throw error;
 
+      // Only include notifications for graded FILE SUBMISSIONS, not other graded assignments.
+      const filteredData = data.filter(item => {
+        const notif = item.notifications;
+        const isGradedFileSubmission = notif?.type === "graded_assignment" && notif?.route?.pathname === '/assignmentDetails';
+        // If it's a graded_assignment, it MUST be a file submission. Otherwise, include it (e.g., messages).
+        return notif?.type !== "graded_assignment" || isGradedFileSubmission;
+      });
+
+      // Format the remaining notifications
       const formatted = await Promise.all(
-        data.map(async (item) => {
+        filteredData.map(async (item) => {
           const notif = item.notifications;
           const isMessageType = notif?.type === "message";
-          const isGradedAssignmentType = notif?.type === "graded_assignment";
+          const isGradedFileType = notif?.type === "graded_assignment" && notif?.route?.pathname === '/assignmentDetails';
 
           let finalRoute = notif?.route;
           // If it's a message, fetch sender's info to populate route params
@@ -97,8 +106,8 @@ export default function Notifications() {
             title: notif?.title,
             message: isMessageType
               ? "You have a new message"
-              : isGradedAssignmentType
-              ? `${notif?.title} - have been graded`
+              : isGradedFileType
+              ? `${notif?.title}" has been graded.` // This is now the only graded assignment message
               : notif?.description || notif?.title,
             type: notif?.type,
             eventDate: notif?.event_date,
@@ -186,6 +195,14 @@ export default function Notifications() {
             filter: `user_id=eq.${user.id}`,
           },
           async (payload) => {
+            // Realtime: Check if the new notification is for a graded assignment that is NOT a file submission, and ignore it.
+            const { data: checkData } = await supabase
+              .from("notifications")
+              .select("type, route").eq("id", payload.new.notification_id).single();
+            const isGradedFileSubmission = checkData?.type === "graded_assignment" && checkData?.route?.pathname === '/assignmentDetails';
+            if (checkData?.type === "graded_assignment" && !isGradedFileSubmission) return;
+
+            // If it's not a graded quiz, process it.
             const { data: notifData } = await supabase
               .from("notifications")
               .select("id, type, title, description, event_date, route")
@@ -194,7 +211,7 @@ export default function Notifications() {
 
             if (notifData) {
               const isMessageType = notifData.type === "message";
-              const isGradedAssignmentType = notifData.type === "graded_assignment";
+              const isGradedFileType = notifData.type === "graded_assignment" && notifData?.route?.pathname === '/assignmentDetails';
 
               let finalRoute = notifData.route;
               // If it's a message, fetch sender's info to populate route params
@@ -224,9 +241,9 @@ export default function Notifications() {
                 title: notifData.title,
                 message: isMessageType
                   ? "You have a new message"
-                  : isGradedAssignmentType
-                    ? `${notifData.title} - have been graded`
-                    : notifData.description || notifData.title,
+                  : isGradedFileType
+                  ? `Your submission for "${notifData.title}" has been graded.` // This is now the only graded assignment message
+                  : notifData.description || notifData.title,
                 type: notifData.type,
                 eventDate: notifData.event_date,
                 route: finalRoute,

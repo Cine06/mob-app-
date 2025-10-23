@@ -272,7 +272,7 @@ export default function ELearningModules() {
           setUserSection(userData.section_id);
            const { data: assignedData, error: assignedError } = await supabase
              .from("assigned_assessments")
-             .select("id, assessment_id, section_id, deadline")
+             .select("id, assessment_id, section_id, deadline, allowed_attempts, time_limit")
              .eq("section_id", userData.section_id);
 
            if (assignedError) {
@@ -295,7 +295,14 @@ export default function ELearningModules() {
                  const assessment = assessmentsData.find(a => a.id === assigned.assessment_id);
                  const questions = assessment?.questions ? (typeof assessment.questions === 'string' ? JSON.parse(assessment.questions) : assessment.questions) : [];
                  assessment.questionCount = questions.length;
-                 return { id: assigned.id, assessment_id: assigned.assessment_id, deadline: assigned.deadline, assessment };
+                 return { 
+                   id: assigned.id, 
+                   assessment_id: assigned.assessment_id, 
+                   deadline: assigned.deadline, 
+                   allowed_attempts: assigned.allowed_attempts,
+                   time_limit: assigned.time_limit,
+                   assessment 
+                  };
                });
 
 
@@ -346,7 +353,9 @@ export default function ELearningModules() {
             assigned_assessments (
               id,
               deadline,
-              section_id
+              section_id,
+              allowed_attempts,
+              time_limit
             )
           `)
           .eq('type', 'Assignment')
@@ -367,6 +376,8 @@ export default function ELearningModules() {
               assessment_id: assessment.id,
               deadline: assignedInfo.deadline,
               section_id: assignedInfo.section_id,
+              allowed_attempts: assignedInfo.allowed_attempts,
+              time_limit: assignedInfo.time_limit,
               assessment: { ...assessment, assigned_assessments: undefined }
             };
           });
@@ -660,6 +671,10 @@ export default function ELearningModules() {
                       <TouchableOpacity
                         style={styles.assignmentItem}
                         onPress={() => {
+                          // Check if the assessment is a file submission type
+                          const questions = item.assessment?.questions ? (typeof item.assessment.questions === 'string' ? JSON.parse(item.assessment.questions) : item.assessment.questions) : [];
+                          const isFileSubmission = questions[0]?.activityType === 'File Submission';
+
                           router.push({
                             pathname: "/assignmentDetails",
                             params: {
@@ -670,14 +685,31 @@ export default function ELearningModules() {
                         }}
                       >
                         <View style={styles.assignmentContent}>
-                          <Text style={styles.assignmentTitle}>{item.assessment.title || 'Untitled Assignment'}</Text>
+                          <View style={styles.titleRow}>
+                            <Text style={styles.assignmentTitle} numberOfLines={2}>
+                              {item.assessment.title || 'Untitled Assignment'}
+                            </Text>
+                            {item.time_limit > 0 && item.assessment?.questions?.[0]?.activityType !== 'File Submission' && (
+                              <View style={styles.timeLimitContainer}>
+                                <Icon name="timer-outline" size={14} color="#495057" />
+                                <Text style={styles.timeLimitText}>{item.time_limit} min</Text>
+                              </View>
+                            )}
+                          </View>
                           <Text style={styles.assignmentDescription}>
                             {item.assessment.description || 'No description available'}
                           </Text>
-                          <View style={styles.assignmentMeta}>
-                            <Text style={styles.assignmentDeadline}>
-                              Deadline: {item.deadline ? new Date(item.deadline).toLocaleDateString() : 'No deadline'}
-                            </Text>
+                          <View style={styles.metaRow}>
+                            <View style={styles.metaItem}>
+                              <Icon name="calendar-clock" size={14} color="#6c757d" />
+                              <Text style={styles.metaText}>
+                                {item.deadline ? new Date(item.deadline).toLocaleDateString() : 'No Due Date'}
+                              </Text>
+                            </View>
+                            <View style={styles.metaItem}>
+                              <Icon name="repeat" size={14} color="#6c757d" />
+                              <Text style={styles.metaText}>{item.allowed_attempts || 1} attempt(s)</Text>
+                            </View>
                           </View>
                         </View>
                         <Icon name="chevron-right" size={24} color="#046a38" />
@@ -715,17 +747,31 @@ No assignments are currently available for your section.</Text>
                         }}
                       >
                         <View style={styles.quizContent}>
-                          <Text style={styles.quizTitle}>{quiz.assessment.title || 'Untitled Quiz'}</Text>
+                          <View style={styles.titleRow}>
+                            <Text style={styles.quizTitle} numberOfLines={2}>
+                              {quiz.assessment.title || 'Untitled Quiz'}
+                            </Text>
+                            {quiz.time_limit && (
+                              <View style={styles.timeLimitContainer}>
+                                <Icon name="timer-outline" size={14} color="#495057" />
+                                <Text style={styles.timeLimitText}>{quiz.time_limit} min</Text>
+                              </View>
+                            )}
+                          </View>
                           <Text style={styles.quizDescription}>
                             {quiz.assessment.description || 'No description available'}
                           </Text>
-                          <View style={styles.quizMeta}>
-                            <Text style={styles.quizDeadline}>
-                              Deadline: {quiz.deadline ? new Date(quiz.deadline).toLocaleDateString() : 'No deadline'}
-                            </Text>
-                            <Text style={styles.quizType}>
-                              {quiz.assessment.questionCount || 0} questions
-                            </Text>
+                          <View style={styles.metaRow}>
+                            <View style={styles.metaItem}>
+                              <Icon name="calendar-clock" size={14} color="#6c757d" />
+                              <Text style={styles.metaText}>
+                                {quiz.deadline ? new Date(quiz.deadline).toLocaleDateString() : 'No Due Date'}
+                              </Text>
+                            </View>
+                            <View style={styles.metaItem}>
+                              <Icon name="repeat" size={14} color="#6c757d" />
+                              <Text style={styles.metaText}>{quiz.allowed_attempts || 1} attempt(s)</Text>
+                            </View>
                           </View>
                         </View>
                         <Icon name="chevron-right" size={24} color="#046a38" />
