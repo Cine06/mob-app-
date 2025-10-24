@@ -119,7 +119,7 @@ function MatchingQuestionAnswer({ question, questionIndex, onAnswerChange, answe
 
 export default function AssignmentDetails() {
   const router = useRouter();
-  const { assessmentId, assignedAssessmentId } = useLocalSearchParams();
+  const { assessmentId, assignedAssessmentId, takeId: navTakeId } = useLocalSearchParams();
   const [assignmentData, setAssignmentData] = useState(null);
   const [assignedData, setAssignedData] = useState(null);
   const [answers, setAnswers] = useState({});
@@ -268,12 +268,21 @@ export default function AssignmentDetails() {
       const isFileSub = parseQuestions(fetchedData.assessmentData).some(q => q.activityType === 'File Submission');
       const isTimed = currentAssignedData.time_limit > 0 && !isFileSub;
 
-      const { data: takes, error: takesError } = await supabase
+      // If a takeId is passed via navigation, prioritize fetching that specific take.
+      // Otherwise, fetch all takes for the user and assignment.
+      const query = supabase
         .from('student_assessments_take')
-        .select('id, score, created_at, started_at')
-        .eq('assigned_assessments_id', assignedAssessmentId)
-        .eq('users_id', currentUser.id)
-        .order('created_at', { ascending: false });
+        .select('id, score, created_at, started_at');
+
+      if (navTakeId) {
+        query.eq('id', navTakeId);
+      } else {
+        query.eq('assigned_assessments_id', assignedAssessmentId)
+             .eq('users_id', currentUser.id)
+             .order('created_at', { ascending: false });
+      }
+
+      const { data: takes, error: takesError } = await query;
 
       if (takesError) throw takesError;
 

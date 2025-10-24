@@ -26,24 +26,28 @@ export default function BottomNav() {
   };
 
   const fetchUnreadCount = async () => {
-    const user = await getUser();
-    if (!user) return;
+  const user = await getUser();
+  if (!user) return;
 
-    const { count, error } = await supabase
-      .from("user_notifications")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .is("read_at", null)
-      .is("dismissed_at", null);
+ const cachedCount = await SecureStore.getItemAsync("unreadCount");
+ if (cachedCount) setUnreadCount(Number(cachedCount));
 
-    if (error) {
-      console.error("Error fetching unread count:", error);
-      return;
-    }
+  const { count, error } = await supabase
+    .from("user_notifications")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .is("read_at", null)
+    .is("dismissed_at", null);
 
-    if (count > unreadCount) startPulse();
-    setUnreadCount(count || 0);
-  };
+  if (error) {
+    console.error("Error fetching unread count:", error);
+    return;
+  }
+
+  if (count > unreadCount) startPulse();
+  setUnreadCount(count || 0);
+};
+
 
   const fetchUnreadMessageCount = async () => {
     const user = await getUser();

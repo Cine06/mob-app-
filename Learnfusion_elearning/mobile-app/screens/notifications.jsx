@@ -24,6 +24,7 @@ export default function Notifications() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedNotifications, setSelectedNotifications] = useState(new Set());
+  const userRef = React.useRef(null); // Use ref to hold user data
 
   // 🔐 Secure user fetch
   const getUser = async () => {
@@ -33,98 +34,68 @@ export default function Notifications() {
 
   // 🔄 Fetch notifications
   const fetchNotifications = async () => {
-    try {
-      setLoading(true);
-      const user = await getUser();
-      if (!user) return;
+  try {
+    if (!refreshing) setLoading(true);
+    const user = await getUser();
+    if (!user) return;
 
-      const { data, error } = await supabase
-        .from("user_notifications")
-        .select(
-          `
+    const { data, error } = await supabase
+      .from("user_notifications")
+      .select(`
+        id,
+        user_id,
+        read_at,
+        dismissed_at,
+        created_at,
+        notifications (
           id,
-          user_id,
-          read_at,
-          dismissed_at,
-          created_at,
-          notifications (
-            id,
-            type,
-            title,
-            description,
-            event_date,
-            route
-          )
-        `
+          type,
+          title,
+          description,
+          event_date,
+          route,
+          take_id
         )
-        .eq("user_id", user.id)
-        .is("dismissed_at", null)
-        .order("created_at", { ascending: false });
+      `)
+      .eq("user_id", user.id)
+      .is("dismissed_at", null)
+      .order("created_at", { ascending: false });
 
-      if (error) throw error;
+    if (error) throw error;
 
-      // Only include notifications for graded FILE SUBMISSIONS, not other graded assignments.
-      const filteredData = data.filter(item => {
-        const notif = item.notifications;
-        const isGradedFileSubmission = notif?.type === "graded_assignment" && notif?.route?.pathname === '/assignmentDetails';
-        // If it's a graded_assignment, it MUST be a file submission. Otherwise, include it (e.g., messages).
-        return notif?.type !== "graded_assignment" || isGradedFileSubmission;
-      });
+    const formatted = data.map((item) => {
+      const notif = item.notifications;
+      const isMessageType = notif.type === "message";
+      const isGradedType = notif.type === "graded_assignment";
+      const isNewAssessment = notif.type === "assignment" || notif.type === "quiz";
 
-      // Format the remaining notifications
-      const formatted = await Promise.all(
-        filteredData.map(async (item) => {
-          const notif = item.notifications;
-          const isMessageType = notif?.type === "message";
-          const isGradedFileType = notif?.type === "graded_assignment" && notif?.route?.pathname === '/assignmentDetails';
+      return {
+        id: notif.id,
+        userNotifId: item.id,
+        title: notif.title,
+        message: notif.description || notif.title,
+        type: notif.type,
+        eventDate: notif.event_date,
+        route: notif.route,
+        takeId: notif.take_id,
+        isRead: !!item.read_at,
+      };
+    });
 
-          let finalRoute = notif?.route;
-          // If it's a message, fetch sender's info to populate route params
-          if (isMessageType && notif.route?.params?.receiverId) {
-            const senderId = notif.route.params.receiverId; // In this context, receiverId is the sender
-            const { data: senderData, error: senderError } = await supabase
-              .from("users")
-              .select("first_name, last_name, profile_picture")
-              .eq("id", senderId)
-              .single();
+    setNotifications(formatted);
 
-            if (!senderError && senderData) {
-              finalRoute = {
-                ...notif.route,
-                params: {
-                  ...notif.route.params,
-                  name: `${senderData.first_name} ${senderData.last_name}`.trim(),
-                  avatar: senderData.profile_picture,
-                },
-              };
-            }
-          }
+    // Store unread count
+    const unreadCount = formatted.filter(n => !n.isRead).length;
+    await SecureStore.setItemAsync("unreadCount", unreadCount.toString());
 
-          return {
-            id: notif?.id,
-            userNotifId: item.id,
-            title: notif?.title,
-            message: isMessageType
-              ? "You have a new message"
-              : isGradedFileType
-              ? `${notif?.title}" has been graded.` // This is now the only graded assignment message
-              : notif?.description || notif?.title,
-            type: notif?.type,
-            eventDate: notif?.event_date,
-            route: finalRoute,
-            isRead: !!item.read_at,
-          };
-        })
-      );
+  } catch (err) {
+    console.error("Error fetching notifications:", err);
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+};
 
-      setNotifications(formatted);
-    } catch (err) {
-      console.error("Error fetching notifications:", err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
 
   // ✅ Mark as read
   const markAsRead = async (notifId) => {
@@ -158,6 +129,16 @@ export default function Notifications() {
           itemId: item.id,
         },
       });
+    } else if (item.type === "graded_assignment" && item.route) {
+      router.push({
+        pathname: item.route.pathname,
+        params: {
+          ...item.route.params,
+          assessmentId: item.route.params.assessmentId,
+          assignedAssessmentId: item.route.params.assignedAssessmentId,
+          takeId: item.takeId, // Pass the takeId to the destination screen
+        },
+      });
     } else if (item.route && item.route.pathname) {
       try {
         router.push({
@@ -177,139 +158,58 @@ export default function Notifications() {
   };
 
   // ⚡ Realtime listener (INSERT + UPDATE)
-  useEffect(() => {
-    let subscription;
-    const initRealtime = async () => {
-      const user = await getUser();
-      if (!user) return;
+ useEffect(() => {
+  let subscription;
 
-      subscription = supabase
-        .channel("realtime_user_notifications")
-        // ✅ INSERT → new notification
-        .on(
-          "postgres_changes",
-          {
-            event: "INSERT",
-            schema: "public",
-            table: "user_notifications",
-            filter: `user_id=eq.${user.id}`,
-          },
-          async (payload) => {
-            const { data: notifDetails, error: notifError } = await supabase
-              .from("notifications")
-              .select("id, type, title, description, event_date, route, take_id")
-              .eq("id", payload.new.notification_id)
-              .single();
+  const initRealtime = async () => {
+    const user = await getUser();
+    if (!user) return;
+    userRef.current = user;
 
-            if (notifError || !notifDetails) return;
+    subscription = supabase
+      .channel("realtime_user_notifications")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "user_notifications",
+          filter: `user_id=eq.${user.id}`,
+        },
+        async (payload) => {
+          const { data: notifDetails, error } = await supabase
+            .from("notifications")
+            .select("id, type, title, description, event_date, route, take_id")
+            .eq("id", payload.new.notification_id)
+            .single();
 
-            // For graded assignments, we must verify the notification is for THIS user.
-            if (notifDetails.type === "graded_assignment") {
-              if (!notifDetails.take_id) return; // Malformed notification, ignore.
+          if (error || !notifDetails) return;
 
-              const { data: takeData, error: takeError } = await supabase
-                .from("student_assessments_take")
-                .select("users_id")
-                .eq("id", notifDetails.take_id)
-                .single();
+          const newNotif = {
+            id: notifDetails.id,
+            userNotifId: payload.new.id,
+            title: notifDetails.title,
+            message: notifDetails.description || notifDetails.title,
+            type: notifDetails.type,
+            eventDate: notifDetails.event_date,
+            route: notifDetails.route,
+            takeId: notifDetails.take_id,
+            isRead: !!payload.new.read_at,
+          };
 
-              // If the submission doesn't belong to the current user, ignore the notification.
-              if (takeError || !takeData || takeData.users_id !== user.id) {
-                return;
-              }
-            }
+          setNotifications((prev) => [newNotif, ...prev]);
+        }
+      )
+      .subscribe();
+  };
 
-            // If it's not a graded quiz, process it.
-            const { data: notifData } = await supabase
-              .from("notifications")
-              .select("id, type, title, description, event_date, route")
-              .eq("id", payload.new.notification_id)
-              .single();
+  initRealtime();
 
-            if (notifData) {
-              const isMessageType = notifData.type === "message";
-              const isGradedFileType = notifData.type === "graded_assignment" && notifData?.route?.pathname === '/assignmentDetails';
+  return () => {
+    if (subscription) supabase.removeChannel(subscription);
+  };
+}, []);
 
-              let finalRoute = notifData.route;
-              // If it's a message, fetch sender's info to populate route params
-              if (isMessageType && notifData.route?.params?.receiverId) {
-                const senderId = notifData.route.params.receiverId;
-                const { data: senderData, error: senderError } = await supabase
-                  .from("users")
-                  .select("first_name, last_name, profile_picture")
-                  .eq("id", senderId)
-                  .single();
-
-                if (!senderError && senderData) {
-                  finalRoute = {
-                    ...notifData.route,
-                    params: {
-                      ...notifData.route.params,
-                      name: `${senderData.first_name} ${senderData.last_name}`.trim(),
-                      avatar: senderData.profile_picture,
-                    },
-                  };
-                }
-              }
-
-              const newNotif = {
-                id: notifData.id,
-                userNotifId: payload.new.id,
-                title: notifData.title,
-                message: isMessageType
-                  ? "You have a new message"
-                  : isGradedFileType
-                  ? `Your submission for "${notifData.title}" has been graded.` // This is now the only graded assignment message
-                  : notifData.description || notifData.title,
-                type: notifData.type,
-                eventDate: notifData.event_date,
-                route: finalRoute,
-                isRead: false,
-              };
-              setNotifications((prev) => [newNotif, ...prev]);
-            }
-          }
-        )
-        // ✅ UPDATE → read_at / dismissed_at changed
-        .on(
-          "postgres_changes",
-          {
-            event: "UPDATE",
-            schema: "public",
-            table: "user_notifications",
-            filter: `user_id=eq.${user.id}`,
-          },
-          async (payload) => {
-            const { new: updatedRow } = payload;
-
-            // If dismissed, remove it from local list
-            if (updatedRow.dismissed_at) {
-              setNotifications((prev) =>
-                prev.filter((n) => n.id !== updatedRow.notification_id)
-              );
-              return;
-            }
-
-            // If marked read, update isRead status
-            if (updatedRow.read_at) {
-              setNotifications((prev) =>
-                prev.map((n) =>
-                  n.id === updatedRow.notification_id
-                    ? { ...n, isRead: true }
-                    : n
-                )
-              );
-            }
-          }
-        )
-        .subscribe();
-    };
-
-    initRealtime();
-    return () => {
-      if (subscription) supabase.removeChannel(subscription);
-    };
-  }, []);
 
   // 🧭 Refresh on screen refocus
   useFocusEffect(
@@ -503,9 +403,16 @@ export default function Notifications() {
           {loading ? (
             <ActivityIndicator style={{ flex: 1 }} size="large" color="#046a38" />
           ) : notifications.length === 0 ? (
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh}>
-              <Text style={styles.noNotifications}>No new notifications</Text>
-            </RefreshControl>
+            <FlatList
+  data={[]}
+  ListEmptyComponent={
+    <Text style={styles.noNotifications}>No new notifications</Text>
+  }
+  refreshControl={
+    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+  }
+/>
+
           ) : (
             <FlatList
               data={notifications}
