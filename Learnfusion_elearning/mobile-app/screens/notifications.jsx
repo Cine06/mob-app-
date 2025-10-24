@@ -328,7 +328,7 @@ export default function Notifications() {
           style={styles.icon}
         />
         <View style={{ flex: 1 }}>
-          <Text style={styles.message}>{item.message}</Text>
+          <Text style={styles.title}>{item.title}</Text>
           <Text style={styles.time}>
             {dayjs(item.eventDate).format("MMM D, YYYY h:mm A")}
           </Text>
