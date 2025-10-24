@@ -238,8 +238,8 @@ const javaKeywords = [
 ];
 const restrictedWords = ["javarice", "java rice", "rice"];
 
-const stopWords = new Set(["what", "is", "the", "a", "an", "of", "in", "are", "for", "to", // English
-                           "ano", "ang", "mga", "sa", "ng", "at", "ay", "para", "tungkol" // Tagalog
+const stopWords = new Set(["what", "is", "the", "a", "an", "of", "in", "are", "for", "to", 
+                           "ano", "ang", "mga", "sa", "ng", "at", "ay", "para", "tungkol" 
                           ]);
 
 const initialChatHistory = [
@@ -265,8 +265,6 @@ const FusionBot = ({ currentUser }) => {
 
   const isMessageOnTopic = (message) => {
     const lower = message.toLowerCase();
-    // A message is on topic if it contains a keyword OR if it's a potential FAQ match.
-    // We will let findFaqAnswer do the detailed check.
     const hasKeywords = javaKeywords.some((k) => lower.includes(k));
     const related = hasKeywords || findFaqAnswer(message) !== null;
     const restricted = restrictedWords.some((w) => lower.includes(w));
@@ -282,8 +280,6 @@ const FusionBot = ({ currentUser }) => {
   
     for (const faq of lessonHandouts) {
       const normalizedFaqQuestion = normalizeString(faq.question);
-      // Check if the normalized FAQ question includes the user's normalized message
-      // and if it's a better match than what we've found so far.
       if (normalizedFaqQuestion.includes(normalizedMessage) && normalizedFaqQuestion.length > bestMatchLength) {
         bestMatch = faq;
         bestMatchLength = normalizedFaqQuestion.length;

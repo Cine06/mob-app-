@@ -51,7 +51,6 @@ export default function CodeSnippets() {
 
   
 
-  // Fetch the current user from SecureStore when the component mounts
   useEffect(() => {
     const fetchUser = async () => {
       try {
@@ -68,7 +67,6 @@ export default function CodeSnippets() {
     fetchUser();
   }, []);
 
-  // Load user-specific completed topics from AsyncStorage once the user is identified
   useEffect(() => {
     const loadCompletedTopics = async () => {
       try {        const storageKey = `completed_topics_${currentUser.id}`;
@@ -86,12 +84,11 @@ export default function CodeSnippets() {
     if (currentUser) {
       loadCompletedTopics();
     }
-  }, [currentUser]); // This effect runs when the currentUser state is updated
+  }, [currentUser]); 
 
-  // Save user-specific completed topics to AsyncStorage whenever they change
   useEffect(() => {
     const saveCompletedTopics = async () => {
-      if (!currentUser) return; // Don't save if there's no user
+      if (!currentUser) return; 
 
       try {
         const storageKey = `completed_topics_${currentUser.id}`;
@@ -448,7 +445,6 @@ public class OOPExample {
     }
 }`,
 
-    // --- Existing useful templates ---
     "Simple addition program": `import java.util.Scanner;
 
 public class AddNumbers {
@@ -651,7 +647,6 @@ public class AddNumbers {
 
     setIsDownloading(true);
     let fileName = "MyCode.java";
-    // Try to find the class name to use as the filename
     const match = code.match(/public class (\w+)/);
     if (match && match[1]) {
       fileName = `${match[1]}.java`;

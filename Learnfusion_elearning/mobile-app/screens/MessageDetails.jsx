@@ -146,8 +146,13 @@ export default function MessageDetails() {
   const sendMessage = async () => {
     if ((newMessage.trim() === "" && !selectedFile) || !currentUser || isSending)
       return;
-    if (selectedFile) return sendFile();
+    
+    // If a file is selected, always use the sendFile logic
+    if (selectedFile) {
+      return sendFile();
+    }
 
+    // This part is now only for sending pure text messages
     const messageContent = newMessage.trim();
     setIsSending(true);
 
@@ -170,11 +175,11 @@ export default function MessageDetails() {
 
     if (error) {
       console.error("Error sending message:", error);
-      setMessages((prev) => prev.filter((m) => m.id !== tempId)); // Keep order
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
       setNewMessage(messageContent);
     } else {
       setMessages((prev) =>
-        prev.map((m) => (m.id === tempId ? data : m)) // Keep order
+        prev.map((m) => (m.id === tempId ? data : m))
       );
     }
     setIsSending(false);
@@ -194,10 +199,10 @@ export default function MessageDetails() {
 
     if (result.canceled) return;
     const file = result.assets[0];
-    const maxFileSize = 250 * 1024 * 1024; // 250MB limit
+    const maxFileSize = 25 * 1024 * 1024; // 25MB limit (aligned with web)
 
     if (file.size > maxFileSize) {
-      Alert.alert("File Too Large", "The selected file exceeds the 250 MB size limit.");
+      Alert.alert("File Too Large", "The selected file exceeds the 25 MB size limit.");
       return;
     }
 
@@ -212,7 +217,7 @@ export default function MessageDetails() {
     const tempId = `temp-file-${Date.now()}`;
     const tempMessage = {
       id: tempId,
-      content: newMessage.trim() || selectedFile.name,
+      content: newMessage.trim(), // Only use the caption for content
       created_at: new Date().toISOString(),
       sender_id: currentUser.id,
       receiver_id: receiverId,
@@ -228,13 +233,14 @@ export default function MessageDetails() {
 
     try {
       const filePath = `${currentUser.id}/${Date.now()}_${selectedFile.name}`;
+      
+      // Use FormData for robust file uploads in React Native
+      const formData = new FormData();
+      formData.append('file', { uri: selectedFile.uri, name: selectedFile.name, type: selectedFile.mimeType });
+
       const { error: uploadError } = await supabase.storage
         .from("message-attachments")
-        .upload(filePath, {
-          uri: selectedFile.uri,
-          name: selectedFile.name,
-          type: selectedFile.mimeType,
-        });
+        .upload(filePath, formData);
 
       if (uploadError) throw uploadError;
 
@@ -248,7 +254,7 @@ export default function MessageDetails() {
       const fileMessage = {
         sender_id: currentUser.id,
         receiver_id: receiverId,
-        content: newMessage.trim() || selectedFile.name,
+        content: tempMessage.content, // Use caption from temp message
         file_url: fileUrl,
         file_name: selectedFile.name,
         file_type: selectedFile.mimeType,
@@ -366,7 +372,7 @@ export default function MessageDetails() {
                           { marginBottom: 15 }, // Consistent padding
                         ]}
                       >
-                        {msg.file_url ? (
+                        {msg.file_name ? ( // Check for file_name to include optimistic messages
                           <TouchableOpacity
                             style={{ flexDirection: "row", alignItems: "center" }}
                             onPress={() => handleFilePress(msg.file_url)}
@@ -396,12 +402,19 @@ export default function MessageDetails() {
                               {msg.file_name || "File"}
                             </Text>
                           </TouchableOpacity>
-                        ) : (
+                        ) : ( // This part now only renders for pure text messages
+                          <Text style={{ color: isMyMessage ? "white" : "#000" }}>
+                            {msg.content}
+                          </Text>
+                        )}
+                        {/* Render caption for file messages */}
+                        {msg.file_name && msg.content && (
                           <Text
                             style={{
-                              color: isMyMessage ? "white" : "#000",
-                            }}
-                          >
+                              color: isMyMessage ? "#e0e0e0" : "#333",
+                              marginTop: 8,
+                              fontSize: 13,
+                            }}>
                             {msg.content}
                           </Text>
                         )}
