@@ -222,6 +222,115 @@ public class ObjectFields {
     }
 }`,
 
+    "Show object lifecycle (creation, dereference, garbage collection with System.gc())": `class MyObject {
+    private String name;
+
+    public MyObject(String name) {
+        this.name = name;
+        System.out.println(this.name + " created.");
+    }
+
+    @Override
+    protected void finalize() throws Throwable {
+        System.out.println(this.name + " is being garbage collected.");
+    }
+}
+
+public class ObjectLifecycle {
+    public static void main(String[] args) {
+        System.out.println("--- Creating object ---");
+        MyObject obj1 = new MyObject("Object 1"); // 1. Creation
+        System.out.println("--- Dereferencing object ---");
+        obj1 = null; // 2. Dereference
+        System.out.println("--- Suggesting Garbage Collection ---");
+        System.gc(); // 3. Suggest GC
+    }
+}`,
+    "Call methods on objects": `class Calculator {
+    // Method with no return value (void)
+    public void displayMessage() {
+        System.out.println("Hello from Calculator!");
+    }
+
+    // Method with a return value (int)
+    public int add(int a, int b) {
+        return a + b;
+    }
+}
+
+public class MethodCallExample {
+    public static void main(String[] args) {
+        // Create a Calculator object
+        Calculator myCalc = new Calculator();
+
+        // 1. Call a method that doesn't return a value
+        myCalc.displayMessage();
+
+        // 2. Call a method that returns a value and store it
+        int sum = myCalc.add(5, 7);
+        System.out.println("The sum is: " + sum);
+    }
+}`,
+    "String and StringBuilder manipulation": `public class StringManipulation {
+    public static void main(String[] args) {
+        // 1. String (immutable)
+        System.out.println("--- String (Immutable) ---");
+        String str1 = "Hello";
+        String str2 = str1 + ", World!"; // Creates a new string object
+        System.out.println("Original String: " + str1);
+        System.out.println("Concatenated String: " + str2);
+
+        // 2. StringBuilder (mutable)
+        System.out.println("\\n--- StringBuilder (Mutable) ---");
+        StringBuilder sb = new StringBuilder("Java");
+        System.out.println("Initial StringBuilder: " + sb);
+
+        // Append
+        sb.append(" is powerful");
+        System.out.println("After append: " + sb);
+
+        // Insert
+        sb.insert(5, "Programming ");
+        System.out.println("After insert: " + sb);
+
+        // Reverse
+        sb.reverse();
+        System.out.println("After reverse: " + sb);
+    }
+}`,
+    "Override precedence with parentheses": `public class Precedence {
+    public static void main(String[] args) {
+        int a = 5, b = 10, c = 2;
+        
+        // Default precedence: multiplication (*) before addition (+)
+        int result1 = a + b * c; // 5 + (10 * 2) = 25
+        System.out.println("Default precedence (a + b * c): " + result1);
+        
+        // Overriding precedence with parentheses
+        int result2 = (a + b) * c; // (5 + 10) * 2 = 30
+        System.out.println("Overridden with parentheses ((a + b) * c): " + result2);
+    }
+}`,
+
+    "Test equality (== vs. .equals())": `public class EqualityTest {
+    public static void main(String[] args) {
+        // == with primitives (compares values)
+        int x = 10;
+        int y = 10;
+        System.out.println("--- Primitives ---");
+        System.out.println("x == y: " + (x == y)); // true
+        
+        // == vs .equals() with Objects (String)
+        String s1 = "hello"; // String literal
+        String s2 = "hello"; // String literal, points to same object in pool
+        String s3 = new String("hello"); // New object in memory
+        
+        System.out.println("\\n--- Objects (String) ---");
+        System.out.println("s1 == s2: " + (s1 == s2)); // true, same reference
+        System.out.println("s1 == s3: " + (s1 == s3)); // false, different references
+        System.out.println("s1.equals(s3): " + s1.equals(s3)); // true, same content
+    }
+}`,
     "Basic arithmetic, relational, logical operators": `public class Operators {
     public static void main(String[] args) {
         int a = 10, b = 5;
@@ -474,6 +583,11 @@ public class AddNumbers {
        "Declare and initialize primitive variables (int, double, boolean, etc.)": ["class variables", "int age", "double height"],
        "Declare and initialize object references (String, custom objects)": ["class objectreferences", "string name", "object obj"],
        "Read and write to object fields": ["class person", "p.name", "p.age"],
+       "Show object lifecycle (creation, dereference, garbage collection with System.gc())": ["class objectlifecycle", "obj1 = null", "system.gc()"],
+       "Call methods on objects": ["class methodcallexample", "mycalc.displaymessage()", "mycalc.add"],
+       "String and StringBuilder manipulation": ["class stringmanipulation", "stringbuilder sb", "sb.append"],
+       "Override precedence with parentheses": ["class precedence", "(a + b) * c"],
+       "Test equality (== vs. .equals())": ["class equalitytest", "s1 == s3", "s1.equals(s3)"],
        "Basic arithmetic, relational, logical operators": ["class operators", "a + b", "a > b"],
        "If-else statements": ["class ifelseexample", "if(num > 0)"],
        "Switch statement": ["class switchexample", "switch(day)"],
