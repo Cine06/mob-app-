@@ -234,7 +234,6 @@ export default function MessageDetails() {
     try {
       const filePath = `${currentUser.id}/${Date.now()}_${selectedFile.name}`;
       
-      // Use FormData for robust file uploads in React Native
       const formData = new FormData();
       formData.append('file', { uri: selectedFile.uri, name: selectedFile.name, type: selectedFile.mimeType });
 

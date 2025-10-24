@@ -26,24 +26,25 @@ export default function Dashboard() {
     }
     setLoadingReminders(true);
     try {
-      const { data, error } = await supabase.rpc("get_section_reminders", { p_section_id: sectionId });
+      const { data, error } = await supabase.rpc("get_section_reminders_v2", { p_section_id: sectionId });
       if (error) {
         console.error("Error fetching reminders:", error);
         setReminders([]);
       } else {
         const now = new Date();
-        const oneDayFromNow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
         const twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
+        const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
         const filteredData = (data || []).filter((item) => {
           if ((item.item_type === "Quiz" || item.item_type === "Assignment") && item.due_date) {
             const dueDate = new Date(item.due_date);
             const createdAt = new Date(item.created_at);
-            return dueDate >= now && (dueDate <= oneDayFromNow || createdAt >= twoDaysAgo);
+            return dueDate >= now && (dueDate <= sevenDaysFromNow || createdAt >= twoDaysAgo);
           }
           if (item.item_type === "Handout") {
             const createdAt = new Date(item.created_at);
-            return createdAt >= twoDaysAgo;
+            return createdAt >= sevenDaysAgo;
           }
           return false;
         });
@@ -230,8 +231,8 @@ export default function Dashboard() {
 
   useFocusEffect(
     useCallback(() => {
-
-      let sectionId = null;
+      let currentSectionId = null;
+      let remindersChannel = null; // Declare channel here to be accessible for cleanup
 
       const setup = async () => {
         const storedUser = await SecureStore.getItemAsync("user");
@@ -248,39 +249,40 @@ export default function Dashboard() {
           if (userError) {
             console.error("Error fetching user section:", userError);
           } else if (userData?.section_id) {
-            sectionId = userData.section_id;
-            fetchReminders(sectionId);
-            fetchLeaderboard(sectionId, parsedUser.id);
+            currentSectionId = userData.section_id;
+            fetchReminders(currentSectionId);
+            fetchLeaderboard(currentSectionId, parsedUser.id);
+
+            // Only subscribe if sectionId is available
+            remindersChannel = supabase
+              .channel("public:reminders")
+              .on(
+                "postgres_changes",
+                { event: "*", schema: "public", table: "assigned_assessments", filter: `section_id=eq.${currentSectionId}` },
+                (payload) => {
+                  fetchReminders(currentSectionId);
+                }
+              )
+              .on(
+                "postgres_changes",
+                { event: "*", schema: "public", table: "handouts_tag_section", filter: `section_id=eq.${currentSectionId}` },
+                (payload) => {
+                  fetchReminders(currentSectionId);
+                }
+              )
+              .subscribe();
 
           } else {
             fetchReminders(null);
             fetchLeaderboard(null, parsedUser.id);
           }
         } else {
-          console.warn("No user found in SecureStore, redirecting to login...");
+          console.warn("No user found in SecureStore, redirecting to login.");
           router.replace("/login");
         }
       };
 
       setup();
-
-      const remindersChannel = supabase
-        .channel("public:reminders")
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "assigned_assessments", filter: `section_id=eq.${sectionId}` },
-          (payload) => {
-            fetchReminders(sectionId);
-          }
-        )
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "handouts_tag_section", filter: `section_id=eq.${sectionId}` },
-          (payload) => {
-            fetchReminders(sectionId);
-          }
-        )
-        .subscribe();
       
 
       return () => {
@@ -333,20 +335,20 @@ export default function Dashboard() {
       case "Quiz":
       case "Assignment":
         const dueDate = new Date(item.due_date);
-        const diffHours = (dueDate - now) / (1000 * 60 * 60);
+        const diffMilliseconds = dueDate.getTime() - now.getTime();
 
         let dueDateString;
-        if (diffHours < 1) {
+        if (diffMilliseconds < 60 * 60 * 1000) { // less than 1 hour
           dueDateString = "due in less than an hour";
-        } else if (diffHours < 24) {
-          dueDateString = `due in ${Math.floor(diffHours)} hours`;
-        } else if (diffHours < 48) {
+        } else if (diffMilliseconds < 24 * 60 * 60 * 1000) { // less than 24 hours
+          dueDateString = `due in ${Math.floor(diffMilliseconds / (1000 * 60 * 60))} hours`;
+        } else if (diffMilliseconds < 48 * 60 * 60 * 1000) { // less than 48 hours
           dueDateString = "due in 1 day";
         } else {
           dueDateString = `due ${dueDate.toLocaleDateString()}`;
         }
 
-        if (diffHours < 48) {
+        if (diffMilliseconds < 48 * 60 * 60 * 1000) { // Check if due within 48 hours
           return `Deadline: ${item.title} (${dueDateString})`;
         }
         return `New ${item.item_type}: ${item.title} (due ${dueDateString})`;

@@ -195,12 +195,29 @@ export default function Notifications() {
             filter: `user_id=eq.${user.id}`,
           },
           async (payload) => {
-            // Realtime: Check if the new notification is for a graded assignment that is NOT a file submission, and ignore it.
-            const { data: checkData } = await supabase
+            const { data: notifDetails, error: notifError } = await supabase
               .from("notifications")
-              .select("type, route").eq("id", payload.new.notification_id).single();
-            const isGradedFileSubmission = checkData?.type === "graded_assignment" && checkData?.route?.pathname === '/assignmentDetails';
-            if (checkData?.type === "graded_assignment" && !isGradedFileSubmission) return;
+              .select("id, type, title, description, event_date, route, take_id")
+              .eq("id", payload.new.notification_id)
+              .single();
+
+            if (notifError || !notifDetails) return;
+
+            // For graded assignments, we must verify the notification is for THIS user.
+            if (notifDetails.type === "graded_assignment") {
+              if (!notifDetails.take_id) return; // Malformed notification, ignore.
+
+              const { data: takeData, error: takeError } = await supabase
+                .from("student_assessments_take")
+                .select("users_id")
+                .eq("id", notifDetails.take_id)
+                .single();
+
+              // If the submission doesn't belong to the current user, ignore the notification.
+              if (takeError || !takeData || takeData.users_id !== user.id) {
+                return;
+              }
+            }
 
             // If it's not a graded quiz, process it.
             const { data: notifData } = await supabase
