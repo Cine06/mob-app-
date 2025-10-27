@@ -24,6 +24,7 @@
     "@supabase/supabase-js": "2.0.0",
     "axios": "^1.8.4",
     "base64-arraybuffer": "^1.0.2",
+    "bcryptjs": "^3.0.2",
     "buffer": "^6.0.3",
     "cors": "^2.8.5",
     "crypto-browserify": "^3.12.1",

@@ -14,30 +14,51 @@ import {
 import { useRouter, Stack } from "expo-router";
 import { supabase } from "../utils/supabaseClient";
 import Icon from "react-native-vector-icons/Feather";
-import bcrypt from "react-native-bcrypt";
-import { getRandomValues } from "react-native-get-random-values";
-import * as SecureStore from "expo-secure-store"; 
+import bcrypt from "bcryptjs"; 
+import * as SecureStore from "expo-secure-store";
 import styles from "../styles/login";
-
-bcrypt.setRandomFallback(getRandomValues);
 
 export default function LoginScreen() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [loginIdentifier, setLoginIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
     setLoading(true);
-    try {      
-      const { data: user, error } = await supabase
-        .from("users")
-        .select("*")
-        .eq("email", email)
-        .single();
+    try {
+      const identifier = loginIdentifier.trim();
+      // A more robust check for email format
+      const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier);
 
-      if (error || !user) {
+      let user = null;
+      let queryError = null;
+
+      if (isEmail) {
+        const { data, error } = await supabase
+          .from("users")
+          .select("*")
+          .eq("email", identifier.toLowerCase())
+          .single();
+        user = data;
+        queryError = error;
+      } else {
+        // ✅ Ensure RPC result is handled safely
+        const { data, error } = await supabase.rpc("get_user_by_username", {
+          p_username: identifier.toLowerCase(),
+        });
+
+        if (error) {
+          console.error("RPC Error:", error);
+        }
+
+        // RPC returns array; get first result safely
+        user = data && data.length > 0 ? data[0] : null;
+        queryError = error;
+      }
+
+      if ((queryError && queryError.code !== 'PGRST116') || !user) { // PGRST116 is "single() row not found"
         throw new Error("Invalid email or password.");
       }
 
@@ -46,7 +67,6 @@ export default function LoginScreen() {
       }
 
       const passwordMatch = bcrypt.compareSync(password, user.password);
-
       if (!passwordMatch) {
         throw new Error("Invalid email or password.");
       }
@@ -67,58 +87,60 @@ export default function LoginScreen() {
 
   return (
     <>
-    <Stack.Screen
-        options={{ headerShown: false }}
-      />
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
-        <View style={styles.container}>
-          <Image source={require("../assets/logo.png")} style={styles.logo} />
-          <Text style={styles.tagline}>Elevate Your Skills with LearnFusion</Text>
-          <Text style={styles.loginTitle}>LOGIN</Text>
+      <Stack.Screen options={{ headerShown: false }} />
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+          <View style={styles.container}>
+            <Image source={require("../assets/logo.png")} style={styles.logo} />
+            <Text style={styles.tagline}>Elevate Your Skills with LearnFusion</Text>
+            <Text style={styles.loginTitle}>LOGIN</Text>
 
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            placeholderTextColor="#666"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-
-          <View style={styles.passwordContainer}>
             <TextInput
-              style={styles.passwordInput}
-              placeholder="Password"
+              style={styles.input}
+              placeholder="Email or Username"
               placeholderTextColor="#666"
-              secureTextEntry={!isPasswordVisible}
-              value={password}
-              onChangeText={setPassword}
+              value={loginIdentifier}
+              onChangeText={setLoginIdentifier}
+              keyboardType="default"
+              autoCapitalize="none"
             />
-            <TouchableOpacity onPress={() => setIsPasswordVisible(!isPasswordVisible)}>
-              <Icon
-                name={isPasswordVisible ? "eye-off" : "eye"}
-                size={24}
-                color="#666"
-                style={{ marginRight: 15 }}
+
+            <View style={styles.passwordContainer}>
+              <TextInput
+                style={styles.passwordInput}
+                placeholder="Password"
+                placeholderTextColor="#666"
+                secureTextEntry={!isPasswordVisible}
+                value={password}
+                onChangeText={setPassword}
               />
+              <TouchableOpacity onPress={() => setIsPasswordVisible(!isPasswordVisible)}>
+                <Icon
+                  name={isPasswordVisible ? "eye-off" : "eye"}
+                  size={24}
+                  color="#666"
+                  style={{ marginRight: 15 }}
+                />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={styles.loginButton}
+              onPress={handleLogin}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.loginButtonText}>LOGIN</Text>
+              )}
             </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.loginButton} onPress={handleLogin} disabled={loading}>
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.loginButtonText}>LOGIN</Text>
-            )}
-          </TouchableOpacity>
-          
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </>
   );
 }
