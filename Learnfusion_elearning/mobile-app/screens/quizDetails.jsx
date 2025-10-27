@@ -428,16 +428,19 @@ const QuizDetails = () => {
       }
 
       // Calculate score
-      const totalQuestions = questions.length;
-      const correctAnswersCount = questions.filter((question, index) => 
-        isAnswerCorrect(question, index, answers[index])
-      ).length;
+      const totalPossiblePoints = questions.reduce((total, q) => total + (q.points || 0), 0);
+      const userScore = questions.reduce((totalScore, question, index) => {
+        if (isAnswerCorrect(question, index, answers[index])) {
+          return totalScore + (question.points || 0); // Use points, default to 0
+        }
+        return totalScore;
+      }, 0);
 
       // Update the take record with the score and submission time
       const { error: updateTakeError } = await supabase
         .from('student_assessments_take')
-        .update({ 
-          score: correctAnswersCount, 
+        .update({
+          score: userScore,
           created_at: new Date().toISOString() // created_at now acts as submitted_at
         })
         .eq('id', takeId);
@@ -471,7 +474,7 @@ const QuizDetails = () => {
 
       Alert.alert(
         "Submission Successful!",
-        `Your score: ${correctAnswersCount}/${totalQuestions}`,
+        `Your score: ${userScore}/${totalPossiblePoints}`,
         [{ text: "Review Answers" }]
       );
       
@@ -852,7 +855,8 @@ const QuizDetails = () => {
                   </View>
                 )}
                 <Text style={{ fontSize: 18, fontWeight: '600', color: '#046a38', flex: 1 }}>
-                  Question {currentQuestionIndex + 1} of {questions.length} ({currentQuestion.activityType})
+                  Question {currentQuestionIndex + 1} of {questions.length} 
+                  {currentQuestion.points ? ` (${currentQuestion.points} ${currentQuestion.points === 1 ? 'pt' : 'pts'})` : ''}
                 </Text>
               </View>
             </View>
@@ -1080,31 +1084,26 @@ const QuizDetails = () => {
             </Text>
             
             {(() => {
-              const totalQuestions = questions.length;
-              const correctCount = questions.filter((question, index) => 
-                isAnswerCorrect(question, index, answers[index])
-              ).length;
-              const score = totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
+              const totalPossiblePoints = questions.reduce((total, q) => total + (q.points || 0), 0);
+              const userScore = questions.reduce((score, question, index) => {
+                if (isAnswerCorrect(question, index, answers[index])) {
+                  return score + (question.points || 0);
+                }
+                return score;
+              }, 0);
+              const scorePercentage = totalPossiblePoints > 0 ? Math.round((userScore / totalPossiblePoints) * 100) : 0;
               
               return (
                 <>
                   <View style={styles.summaryStat}>
-                    <Text style={styles.summaryLabel}>Total Questions:</Text>
-                    <Text style={styles.summaryValue}>{totalQuestions}</Text>
-                  </View>
-                  
-                  <View style={styles.summaryStat}>
-                    <Text style={styles.summaryLabel}>Correct Answers:</Text>
-                    <Text style={[styles.summaryValue, { color: '#4CAF50' }]}>{correctCount}</Text>
-                  </View>
-                  
-                  <View style={styles.summaryStat}>
-                    <Text style={styles.summaryLabel}>Incorrect Answers:</Text>
-                    <Text style={[styles.summaryValue, { color: '#D32F2F' }]}>{totalQuestions - correctCount}</Text>
+                    <Text style={styles.summaryLabel}>Your Score:</Text>
+                    <Text style={[styles.summaryValue, { color: '#4A148C' }]}>
+                      {userScore} / {totalPossiblePoints}
+                    </Text>
                   </View>
                   
                   <View style={styles.scoreContainer}>
-                    <Text style={styles.scoreText}>Score: {score}%</Text>
+                    <Text style={styles.scoreText}>Final Score: {scorePercentage}%</Text>
                   </View>
                 </>
               );

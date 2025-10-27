@@ -429,7 +429,7 @@ export default function AssignmentDetails() {
 
   const isAnswerCorrect = (question, questionIndex, userAnswer) => {
     const correctAnswer = getCorrectAnswer(question, questionIndex);
-    if (!correctAnswer || !userAnswer) return false;
+    if (!userAnswer) return false; // correctAnswer can be 0 for file submission
 
     if (question.activityType === 'File Submission') return false; // Manually graded
 
@@ -527,11 +527,13 @@ export default function AssignmentDetails() {
         finalScore = null;
       } else {
         // Auto-grade any non-file submission questions
-        const autoGradedQuestions = questions.filter(q => q.activityType !== 'File Submission');
-        const correctAnswersCount = autoGradedQuestions.filter(question => 
-          isAnswerCorrect(question, questions.indexOf(question), answers[questions.indexOf(question)])
-        ).length;
-        finalScore = correctAnswersCount;
+        finalScore = questions.reduce((totalScore, question, index) => {
+          if (question.activityType !== 'File Submission' && isAnswerCorrect(question, index, answers[index])) {
+            // Add the question's points if the answer is correct
+            return totalScore + (question.points || 0); // Use points, default to 0
+          }
+          return totalScore;
+        }, 0);
       }
 
       const { error: updateTakeError } = await supabase
@@ -564,8 +566,10 @@ export default function AssignmentDetails() {
       if (isFileSubmissionOnly) {
         alertMessage = "Your files have been submitted and are waiting for grading.";
       } else if (finalScore !== null) {
-        const totalAutoGradable = questions.filter(q => q.activityType !== 'File Submission').length;
-        alertMessage = `Your score: ${finalScore}/${totalAutoGradable}`;
+        const totalPossiblePoints = questions
+          .filter(q => q.activityType !== 'File Submission')
+          .reduce((total, q) => total + (q.points || 0), 0);
+        alertMessage = `Your score: ${finalScore}/${totalPossiblePoints}`;
       }
       Alert.alert("Submission Successful!", alertMessage, [{ text: "Review Answers" }]);
   
@@ -915,7 +919,9 @@ export default function AssignmentDetails() {
                   </View>
                 )}
                 <Text style={{ fontSize: 18, fontWeight: '600', color: '#046a38', flex: 1 }}>
-                  Question {currentQuestionIndex + 1} of {questions.length} ({currentQuestion.activityType})
+                  Question {currentQuestionIndex + 1} of {questions.length}
+                  {currentQuestion.points > 0 && ` (${currentQuestion.points} ${currentQuestion.points === 1 ? 'pt' : 'pts'})`}
+                  {currentQuestion.maxScore > 0 && ` (${currentQuestion.maxScore} ${currentQuestion.maxScore === 1 ? 'pt' : 'pts'})`}
                 </Text>
               </View>
             </View>
@@ -943,6 +949,34 @@ export default function AssignmentDetails() {
                   </TouchableOpacity>
                 )}
                 <View>
+                  {/* Display Grading Criteria for File Submission */}
+                  {currentQuestion.criteria && currentQuestion.criteria.length > 0 && (
+                    <View style={styles.criteriaTable}>
+                      <View style={styles.criteriaTableHeader}>
+                        <Text style={styles.criteriaTableHeaderText}>Grading Criteria</Text>
+                      </View>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+                        <View style={{ minWidth: 500 }}>
+                          <View style={styles.criteriaHeaderRow}>
+                            <Text style={[styles.criteriaHeaderText, { width: 120 }]}>Criteria</Text>
+                            <Text style={[styles.criteriaHeaderText, { flex: 1 }]}>Description</Text>
+                            <Text style={[styles.criteriaHeaderText, { width: 60, textAlign: 'right' }]}>Points</Text>
+                          </View>
+                          <View style={styles.criteriaBody}>
+                            {currentQuestion.criteria.map((crit, critIndex) => (
+                              <View key={critIndex} style={styles.criterionRow}>
+                                <Text style={[styles.criterionCell, styles.criterionName, { width: 120 }]} selectable>{crit.name}</Text>
+                                <Text style={[styles.criterionCell, styles.criterionDescription, { flex: 1 }]} selectable>{crit.description}</Text>
+                                <Text style={[styles.criterionCell, styles.criterionPoints, { width: 60, textAlign: 'right' }]} selectable>{crit.points}</Text>
+                              </View>
+                            ))}
+                          </View>
+                        </View>
+                      </ScrollView>
+                    </View>
+                  )}
+
+                  {/* Submitted Files Section */}
                   {viewingResults ? (
                     <View>
                       {/* List of submitted files from the 'answers' state */}
@@ -1196,16 +1230,20 @@ export default function AssignmentDetails() {
             {(() => {
               const isFileSubmissionOnly = questions.every(q => q.activityType === 'File Submission');
               const autoGradedQuestions = questions.filter(q => q.activityType !== 'File Submission');
-              const totalAutoGradable = autoGradedQuestions.length;
-              const correctCount = autoGradedQuestions.filter((q, index) => 
-                isAnswerCorrect(q, questions.findIndex(origQ => origQ === q), answers[questions.findIndex(origQ => origQ === q)])
-              ).length;
-              const scorePercentage = totalAutoGradable > 0 ? Math.round((correctCount / totalAutoGradable) * 100) : 0;
+
+              const totalPossiblePoints = autoGradedQuestions.reduce((total, q) => total + (q.points || 0), 0);
+              const userScore = autoGradedQuestions.reduce((score, q) => {
+                const originalIndex = questions.findIndex(origQ => origQ === q);
+                if (isAnswerCorrect(q, originalIndex, answers[originalIndex])) {
+                  return score + (q.points || 0);
+                }
+                return score;
+              }, 0);
 
               if (isFileSubmissionOnly) {
                 let totalPossibleScore = 'N/A';
                 if (questions.length > 0 && questions[0].maxScore !== undefined) {
-                    totalPossibleScore = questions[0].maxScore;
+                  totalPossibleScore = questions[0].maxScore;
                 }
                 return (
                   <>
@@ -1226,19 +1264,13 @@ export default function AssignmentDetails() {
               return (
                 <>
                   <View style={styles.summaryStat}>
-                    <Text style={styles.summaryLabel}>Total Questions:</Text>
-                    <Text style={styles.summaryValue}>{totalAutoGradable}</Text>
-                  </View>
-                  <View style={styles.summaryStat}>
-                    <Text style={styles.summaryLabel}>Correct Answers:</Text>
-                    <Text style={[styles.summaryValue, { color: '#4CAF50' }]}>{correctCount}</Text>
-                  </View>
-                  <View style={styles.summaryStat}>
-                    <Text style={styles.summaryLabel}>Incorrect Answers:</Text>
-                    <Text style={[styles.summaryValue, { color: '#D32F2F' }]}>{totalAutoGradable - correctCount}</Text>
+                    <Text style={styles.summaryLabel}>Auto-Graded Score:</Text>
+                    <Text style={[styles.summaryValue, { color: '#4A148C' }]}>{userScore} / {totalPossiblePoints}</Text>
                   </View>
                   <View style={styles.scoreContainer}>
-                    <Text style={styles.scoreText}>Score: {scorePercentage}%</Text>
+                    <Text style={styles.scoreText}>
+                      Score: {totalPossiblePoints > 0 ? Math.round((userScore / totalPossiblePoints) * 100) : 0}%
+                    </Text>
                   </View>
                   {questions.some(q => q.activityType === 'File Submission') && (
                     <View style={styles.waitingGradeBoxSummary}>
@@ -1414,6 +1446,38 @@ const styles = StyleSheet.create({
   startCancelButton: { paddingVertical: 12, paddingHorizontal: 40, borderRadius: 10, width: '100%' },
   startCancelButtonText: { color: '#666', fontSize: 16, fontWeight: '500', textAlign: 'center' },
 
+  // Criteria Styles
+  criteriaTable: {
+    marginTop: 15,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    overflow: 'hidden',
+  },
+  criteriaTableHeaderText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    padding: 16,
+    backgroundColor: '#f8f9fa',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  criteriaHeaderRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    gap: 16,
+    paddingVertical: 12,
+    backgroundColor: '#f8f9fa',
+  },
+  criteriaHeaderText: { fontSize: 13, fontWeight: '600', color: '#6b7280' },
+  criteriaBody: { paddingHorizontal: 16, paddingTop: 12 },
+  criterionRow: { flexDirection: 'row', paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#e5e7eb', gap: 16 },
+  criterionCell: { fontSize: 14, color: '#6b7280', lineHeight: 20 },
+  criterionName: { fontWeight: '500', color: '#1f2937' },
+  criterionDescription: { color: '#6b7280' },
+  criterionPoints: { fontWeight: '600', color: '#046a38' },
   // Matching Type Styles
   matchingContainer: { marginBottom: 20 },
   promptsContainer: { marginBottom: 20 },

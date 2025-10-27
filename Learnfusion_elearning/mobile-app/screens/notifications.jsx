@@ -319,6 +319,8 @@ export default function Notifications() {
               ? "question-circle"
               : item.type === "handout"
               ? "file-alt"
+              : item.type === "deadline"
+              ? "clock"
               : item.type === "graded_assignment"
               ? "clipboard-check" // Using a clipboard-check icon for graded assignments
               : "bell"
@@ -328,7 +330,7 @@ export default function Notifications() {
           style={styles.icon}
         />
         <View style={{ flex: 1 }}>
-          <Text style={styles.title}>{item.title}</Text>
+          <Text style={styles.title}>{item.message}</Text>
           <Text style={styles.time}>
             {dayjs(item.eventDate).format("MMM D, YYYY h:mm A")}
           </Text>
