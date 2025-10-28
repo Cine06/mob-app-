@@ -7,41 +7,34 @@ export default StyleSheet.create({
         backgroundColor: "#046a38" 
     },
     icon: { 
-        left: 75, 
-        marginTop: 30 
+        marginRight: 10, // Add space between icon and text
     },
     header: { 
         flexDirection: "row", 
         backgroundColor: "#046a38", 
-        padding: 10, 
-        borderColor: "black", 
-        borderWidth: 2 
+        padding: 15,
+        alignItems: 'center',
+        paddingTop: 40, // Adjust for status bar
+        justifyContent: 'center', // Center children horizontally
     },
     addButton: { 
         padding: 10 
     },
     headerText: { 
         color: "white", 
-        marginTop: 30, 
-        fontSize: 18, 
+        fontSize: 20, 
         fontWeight: "bold", 
-        flex: 1, 
-        left: 85, 
-        marginBottom: 10 
+        marginTop: 8
     },
     fileNameContainer: { 
         flexDirection: "row", 
         backgroundColor: "#027d43", 
-        padding: 10, 
+        paddingHorizontal: 10,
+        paddingVertical: 5,
         justifyContent :"space-between",
         alignItems: "center",
-        borderColor: "black", 
-        borderWidth: 1 
-    },
-    fileName: { 
-        color: "white", 
-        fontSize: 16, 
-        textDecorationLine: "underline" 
+        borderBottomWidth: 1,
+        borderBottomColor: '#015830'
     },
     tabContainer: { 
         flexDirection: "row", 
@@ -63,7 +56,8 @@ export default StyleSheet.create({
     },
     contentContainer: { 
         flex: 1, 
-        padding: 10 
+        padding: 10,
+        backgroundColor: '#f0f0f0'
     },
     codeInput: { 
         backgroundColor: "white", 
@@ -174,6 +168,91 @@ export default StyleSheet.create({
         padding: 5,
         backgroundColor: "#e8f5e8",
         borderRadius: 3
+    },
+
+    // File Tabs
+    fileTabsContainer: {
+        flexDirection: 'row',
+        backgroundColor: '#e0e0e0',
+        paddingTop: 5,
+        borderTopLeftRadius: 8,
+        borderTopRightRadius: 8,
+    },
+    fileTab: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 10,
+        paddingHorizontal: 15,
+        backgroundColor: '#e0e0e0',
+        borderRightWidth: 1,
+        borderRightColor: '#ccc',
+        justifyContent: 'center',
+    },
+    activeFileTab: {
+        backgroundColor: 'white',
+        borderBottomColor: 'white', // Hides bottom border
+    },
+    fileTabText: {
+        fontSize: 14,
+        color: '#333',
+    },
+    activeFileTabText: {
+        fontWeight: 'bold',
+    },
+    closeFileButton: {
+        marginLeft: 10,
+        padding: 5,
+    },
+    addFileButton: {
+        padding: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 15,
+    },
+
+    // Modal Styles
+    modalContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    },
+    modalView: {
+        margin: 20,
+        backgroundColor: 'white',
+        borderRadius: 20,
+        padding: 35,
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+        elevation: 5,
+        width: '80%',
+    },
+    modalText: {
+        marginBottom: 15,
+        textAlign: 'center',
+        fontSize: 18,
+        fontWeight: 'bold',
+    },
+    modalInput: {
+        height: 40,
+        borderColor: 'gray',
+        borderWidth: 1,
+        borderRadius: 5,
+        width: '100%',
+        marginBottom: 20,
+        paddingHorizontal: 10,
+    },
+    modalButtonContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+    },
+    modalButton: { borderRadius: 10, padding: 10, elevation: 2, marginHorizontal: 10, minWidth: 80, alignItems: 'center' },
+    buttonClose: { backgroundColor: '#ccc' },
+    buttonCreate: { backgroundColor: '#046a38' },
+    textStyle: { color: 'white', fontWeight: 'bold', textAlign: 'center'
     }
     
   });

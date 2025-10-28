@@ -8,6 +8,8 @@ import {
   ScrollView,
   Alert,
   KeyboardAvoidingView,
+  Modal,
+  Pressable,
   Platform,
   ActivityIndicator,
 } from "react-native";
@@ -36,18 +38,25 @@ const {
   JDOODLE_RUN_URL,
 } = Constants.expoConfig?.extra || {};
 
+const defaultFile = { id: 1, name: "Main.java", content: "" };
+
 export default function CodeSnippets() {
   const [selectedTab, setSelectedTab] = useState("code");
-  const [code, setCode] = useState("");
+  const [files, setFiles] = useState([defaultFile]);
+  const [activeFileId, setActiveFileId] = useState(1);
   const [output, setOutput] = useState("Output will be displayed here");
   const [isRunning, setIsRunning] = useState(false);
   const [stdin, setStdin] = useState("");
   const [isDownloading, setIsDownloading] = useState(false);
   const [completedTopics, setCompletedTopics] = useState(new Set());
   const [activeTopic, setActiveTopic] = useState(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [newFileName, setNewFileName] = useState("");
   const [currentUser, setCurrentUser] = useState(null);
   const outputScrollRef = useRef(null);
-  const showInputPanel = code.includes("Scanner");
+
+  const activeFile = files.find((f) => f.id === activeFileId) || files[0];
+  const showInputPanel = files.some(f => f.content.includes("Scanner"));
 
   
 
@@ -132,8 +141,10 @@ export default function CodeSnippets() {
     "Object-Oriented Programming": [
       "Create a class with fields and methods",
       "Use constructors to initialize objects",
-      "Call methods on objects",
-      "Object-Oriented Programming Example"
+      "Use Getters and Setters",
+      "Demonstrate Encapsulation",
+      "Demonstrate Inheritance & Polymorphism",
+      "Demonstrate Abstraction"
     ]
   };
 
@@ -394,56 +405,212 @@ public class ArrayListExample {
     }
 }`,
 
-    "Create a class with fields and methods": `class Car {
+    "Create a class with fields and methods": {
+      main: `public class Main {
+    public static void main(String[] args) {
+        // Create an instance of the Car class
+        Car myCar = new Car();
+
+        // Assign values to its fields
+        myCar.model = "Toyota Camry";
+        myCar.year = 2023;
+
+        // Call the display method
+        myCar.display();
+    }
+}`,
+      other: `// Car.java
+class Car {
+    // Fields (or properties)
     String model;
     int year;
 
+    // Method (or behavior)
     void display() {
-        System.out.println(model + " - " + year);
+        System.out.println("Model: " + model);
+        System.out.println("Year: " + year);
     }
-}
+}`
+    },
 
-public class CarExample {
+    "Use constructors to initialize objects": {
+      main: `public class Main {
     public static void main(String[] args) {
-        Car c = new Car();
-        c.model = "Toyota";
-        c.year = 2022;
-        c.display();
+        // Create a Book object using its constructor
+        Book myBook = new Book("The Lord of the Rings", "J.R.R. Tolkien");
+
+        System.out.println("Title: " + myBook.title);
+        System.out.println("Author: " + myBook.author);
     }
 }`,
-
-    "Use constructors to initialize objects": `class Book {
+      other: `// Book.java
+public class Book {
     String title;
-    Book(String t) {
-        title = t;
-    }
-}
+    String author;
 
-public class ConstructorExample {
+    // Constructor to initialize the object's fields
+    public Book(String title, String author) {
+        this.title = title;
+        this.author = author;
+    }
+}`
+    },
+
+    "Use Getters and Setters": {
+      main: `public class Main {
     public static void main(String[] args) {
-        Book b = new Book("Java 101");
-        System.out.println("Book title: " + b.title);
+        // Create a Student object
+        Student student = new Student();
+
+        // Use setter methods to assign values
+        student.setName("Alex");
+        student.setGrade(95);
+
+        // Use getter methods to retrieve and print values
+        System.out.println("Student Name: " + student.getName());
+        System.out.println("Student Grade: " + student.getGrade());
     }
 }`,
+      other: `// Student.java
+public class Student {
+    private String name;
+    private int grade;
 
-    "Object-Oriented Programming Example": `class Animal {
-    void sound() {
-        System.out.println("Some sound");
-    }
-}
+    // Getter for 'name'
+    public String getName() { return this.name; }
 
-class Dog extends Animal {
-    void sound() {
-        System.out.println("Bark");
-    }
-}
+    // Setter for 'name'
+    public void setName(String name) { this.name = name; }
 
-public class OOPExample {
+    // Getter and Setter for 'grade' can be added similarly
+    public int getGrade() { return this.grade; }
+    public void setGrade(int grade) { this.grade = grade; }
+}`
+    },
+    "Demonstrate Encapsulation": {
+      main: `public class Main {
     public static void main(String[] args) {
-        Animal a = new Dog();
-        a.sound(); // Polymorphism
+        // Create a Person object
+        Person person = new Person();
+
+        // Set data using public setter methods
+        person.setName("Francine");
+        person.setAge(21);
+
+        // Get data using public getter methods
+        System.out.println("Name: " + person.getName());
+        System.out.println("Age: " + person.getAge());
+
+        // Direct access to private fields is not allowed
+        // person.name = "Error"; // This would cause a compilation error
     }
 }`,
+      other: `// Person.java
+public class Person {
+    // Private fields - data is hidden from other classes
+    private String name;
+    private int age;
+
+    // Public getter method for name
+    public String getName() {
+        return name;
+    }
+
+    // Public setter method for name
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    // Public getter method for age
+    public int getAge() {
+        return age;
+    }
+
+    // Public setter method for age
+    public void setAge(int age) {
+        if (age > 0) { // Basic validation
+            this.age = age;
+        }
+    }
+}`
+    },
+
+    "Demonstrate Inheritance & Polymorphism": {
+      main: `public class Main {
+    public static void main(String[] args) {
+        // Create objects of each class
+        Animal myAnimal = new Animal();
+        Animal myDog = new Dog(); // A Dog is an Animal (Polymorphism)
+        Animal myCat = new Cat(); // A Cat is an Animal (Polymorphism)
+
+        // Call the sound() method on each object
+        System.out.print("Animal says: ");
+        myAnimal.sound();
+
+        System.out.print("Dog says: ");
+        myDog.sound();
+
+        System.out.print("Cat says: ");
+        myCat.sound();
+    }
+}`,
+      other: `// Animal.java (Superclass)
+public class Animal {
+    public void sound() {
+        System.out.println("The animal makes a sound");
+    }
+}
+
+// Dog.java (Subclass)
+class Dog extends Animal { // 'extends' keyword for inheritance
+    @Override // Annotation to override the parent method
+    public void sound() {
+        System.out.println("The dog barks");
+    }
+}
+
+// Cat.java (Subclass)
+class Cat extends Animal { // 'extends' keyword for inheritance
+    @Override // Annotation to override the parent method
+    public void sound() {
+        System.out.println("The cat meows");
+    }
+}`
+    },
+
+    "Demonstrate Abstraction": {
+      main: `public class Main {
+    public static void main(String[] args) {
+        // Cannot create an instance of an abstract class
+        // Shape myShape = new Shape(); // This would cause a compilation error
+
+        Shape circle = new Circle(5.0);
+        Shape rectangle = new Rectangle(4.0, 6.0);
+
+        System.out.println("Area of Circle: " + circle.getArea());
+        System.out.println("Area of Rectangle: " + rectangle.getArea());
+    }
+}`,
+      other: `// Shape.java (Abstract Class)
+public abstract class Shape {
+    // Abstract method - must be implemented by subclasses
+    public abstract double getArea();
+}
+
+// Circle.java
+class Circle extends Shape {
+    private double radius;
+    public Circle(double radius) { this.radius = radius; }
+    public double getArea() { return Math.PI * radius * radius; }
+}
+
+// Rectangle.java
+class Rectangle extends Shape {
+    private double width, height;
+    public Rectangle(double w, double h) { this.width = w; this.height = h; }
+    public double getArea() { return width * height; }
+}`
+    },
 
     "Simple addition program": `import java.util.Scanner;
 
@@ -502,21 +669,87 @@ public class AddNumbers {
   const proceedWithRun = async () => {
     setOutput("Running code...");
     setIsRunning(true);
-    setSelectedTab("output");
+    setSelectedTab("output"); 
+
+    // Find the main file, which contains the entry point of the program.
+    const mainFile = files.find(f => f.content.includes("public static void main")) || files[0];
+    const importRegex = /^\s*import\s+[\w\.\*]+;/gm;
+    let allImports = new Set();
+    let mainClassCode = "";
+    let otherClassCode = [];
+
+    files.forEach(file => {
+      const content = file.content || "";
+      // Collect all unique import statements from all files.
+      const imports = content.match(importRegex) || [];
+      imports.forEach(imp => allImports.add(imp));
+      
+      // Separate the main class from other classes.
+      if (file.id === mainFile.id) {
+        // For the main file, just remove its imports. The public class remains.
+        mainClassCode = content.replace(importRegex, '').trim();
+      } else {
+        // For other files, remove imports AND the 'public' keyword from the class.
+        const classCode = content.replace(importRegex, '').replace(/public class/g, 'class').trim();
+        if (classCode) otherClassCode.push(classCode);
+      }
+    });
+
+    const uniqueImports = Array.from(allImports).join('\n');
+    // Assemble the final code: imports first, then other classes, then the main class.
+    const fullCode = `${uniqueImports}\n\n${otherClassCode.join('\n\n')}\n\n${mainClassCode}`;
   
     try {
-      log("Executing on JDoodle with provided stdin...");
-      const result = await executeOnJDoodle(code, stdin);
+      log("Executing on JDoodle with provided stdin...", {
+        fullCodeLength: fullCode.length,
+        stdinLength: stdin.length,
+      });
+      const result = await executeOnJDoodle(fullCode, stdin);
       log("JDoodle result processed", result);
-  
-      const programOutput = result.output?.trim() || "No output received.";
-      let finalOutput = "";
+
+      let programOutput = result.output || "No output received.";
+      let finalOutput = "--- Output ---\n";
 
       if (stdin.trim()) {
-        const formattedInput = stdin.trim().split('\n').map(line => `> ${line}`).join('\n');
-        finalOutput += `Your Input:\n${formattedInput}\n\n--- Output ---\n`;
+        // Simulate an interactive terminal by merging prompts and input
+        const inputLines = stdin.trim().split('\n');
+        let currentInputIndex = 0;
+        let finalMergedOutputParts = [];
+        let lastIndex = 0;
+        let match;
+
+        // Regex to find prompts ending with a colon and optional space,
+        // which are typically followed by user input.
+        const promptRegex = /(.+?:\s*)/g;
+
+        while ((match = promptRegex.exec(programOutput)) !== null) {
+          const promptText = match[1];
+          const startIndex = match.index;
+          const endIndex = promptRegex.lastIndex;
+
+          // Add any text before this prompt
+          if (startIndex > lastIndex) {
+            finalMergedOutputParts.push(programOutput.substring(lastIndex, startIndex));
+          }
+
+          // Add the prompt and the corresponding input
+          if (currentInputIndex < inputLines.length) {
+            finalMergedOutputParts.push(promptText + inputLines[currentInputIndex++] + '\n');
+          } else {
+            finalMergedOutputParts.push(promptText); // No more input, just add the prompt
+          }
+          lastIndex = endIndex;
+        }
+
+        // Add any remaining output after the last prompt
+        if (lastIndex < programOutput.length) {
+          finalMergedOutputParts.push(programOutput.substring(lastIndex));
+        }
+
+        finalOutput += finalMergedOutputParts.join('').trim();
+      } else {
+        finalOutput += programOutput;
       }
-      finalOutput += programOutput;
       setOutput(finalOutput);
       
       if (result.success) {
@@ -532,9 +765,9 @@ public class AddNumbers {
   }
 
   const runCode = () => {
-    log("Starting new run", { codeLength: code.length, stdinLength: stdin.length });
+    log("Starting new run", { fileCount: files.length, stdinLength: stdin.length });
 
-    if (!code.trim()) {
+    if (files.every(f => !f.content.trim())) {
       Alert.alert("Error", "Please enter some code to run");
       log("Run aborted — empty code");
       return;
@@ -553,6 +786,56 @@ public class AddNumbers {
     proceedWithRun();
   };
 
+  const handleFileContentChange = (text) => {
+    const updatedFiles = files.map((file) =>
+      file.id === activeFileId ? { ...file, content: text } : file
+    );
+    setFiles(updatedFiles);
+  };
+
+  const addFile = () => {
+    const name = newFileName.trim().endsWith(".java") ? newFileName.trim() : `${newFileName.trim()}.java`;
+    const newFile = { id: Date.now(), name, content: `public class ${name.replace(".java", "")} {\n\n}` };
+    setFiles([...files, newFile]);
+    setActiveFileId(newFile.id);
+    setNewFileName("");
+    setModalVisible(false);
+  };
+
+  const handleDeleteOrClearFile = (fileToDelete) => {
+    if (!fileToDelete) return;
+
+    const isMainJava = fileToDelete.name === "Main.java";
+    const isLastFile = files.length <= 1;
+
+    if (isMainJava || isLastFile) {
+      // This is Main.java or the last file, so we only clear its content.
+      Alert.alert("Clear Content", `Are you sure you want to clear the content of ${fileToDelete.name}?`, [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear",
+          style: "destructive",
+          onPress: () => {
+            const updatedFiles = files.map(f => f.id === fileToDelete.id ? { ...f, content: "" } : f);
+            setFiles(updatedFiles);
+          },
+        },
+      ]);
+    } else {
+      // This is a deletable file.
+      Alert.alert("Delete File", `Are you sure you want to delete ${fileToDelete.name}?`, [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            setFiles(prevFiles => prevFiles.filter(f => f.id !== fileToDelete.id));
+            setActiveFileId(files.find(f => f.id !== fileToDelete.id)?.id || defaultFile.id);
+          },
+        },
+      ]);
+    }
+  };
   const hasException = (text) => {
     const lower = text.toLowerCase();
     return lower.includes("exception in thread") || lower.includes("error:");
@@ -561,10 +844,15 @@ public class AddNumbers {
   const checkCodeCompletion = (topicToCheck = activeTopic) => {
      if (!topicToCheck) return;
  
-     const codeLower = code.toLowerCase();
+     const allCode = files.map(f => f.content).join('\n').toLowerCase();
      const newCompleted = new Set(completedTopics);
+
+     // Find the main file content for checks that are specific to it
+     const mainFile = files.find(f => f.content.includes("public static void main"));
+     const mainCodeLower = mainFile ? mainFile.content.toLowerCase() : allCode;
+
      const checkAndAdd = (topic, keywords) => {
-       if (keywords.every(kw => codeLower.includes(kw))) {
+       if (keywords.every(kw => allCode.includes(kw))) {
          if (!newCompleted.has(topic)) {
            newCompleted.add(topic);
            log(`Checklist: "${topic}" marked complete`);
@@ -590,28 +878,51 @@ public class AddNumbers {
        "Declare, initialize, and use a 1D array": ["class array1d", "int[] nums"],
        "Declare, initialize, and use a 2D array": ["class array2d", "int[][] matrix"],
        "Use an ArrayList (add, remove, get elements)": ["class arraylistexample", "arraylist<string>"],
-       "Create a class with fields and methods": ["class car", "void display()"],
-       "Use constructors to initialize objects": ["class book", "book(string t)"],
-       "Object-Oriented Programming Example": ["class animal", "class dog extends animal", "a.sound()"],
+       "Create a class with fields and methods": ["class main", "mycar.display()"],
+       "Use constructors to initialize objects": ["class main", "new book("],
+       "Use Getters and Setters": ["class main", "student.setname", "student.getname"],
+       "Demonstrate Encapsulation": ["class main", "person.setname", "person.getname"],
+       "Demonstrate Inheritance & Polymorphism": ["class main", "class dog extends animal", "mycat.sound()"],
+       "Demonstrate Abstraction": ["abstract class animal", "mycat.sound()", "mydog.sleep()"],
        "Simple addition program": ["class addnumbers", "enter first number"],
      };
  
      if (topicChecks[topicToCheck]) {
        checkAndAdd(topicToCheck, topicChecks[topicToCheck]);
-     }
+      }
  
      if (newCompleted.size > completedTopics.size) {
        setCompletedTopics(newCompleted);
      }
    };
   const loadTemplate = (topic) => {
-    if (codeTemplates[topic]) {
+    const template = codeTemplates[topic];
+    if (template) {
       Alert.alert("Load Template", `Load template for "${topic}"?`, [
         { text: "Cancel", style: "cancel" },
         {
           text: "Load Template",
           onPress: () => {
-            setCode(codeTemplates[topic]);
+            if (typeof template === 'object' && template.main && template.other) {
+              const mainFile = { id: 1, name: "Main.java", content: template.main };
+              // Split the 'other' block into multiple class definitions
+              const otherClasses = template.other.split(/(?=\s*(?:\/\/.*)?\s*(?:public |abstract )?class )/).filter(s => s.trim());
+              const otherFiles = otherClasses.map((classContent, index) => {
+                // This regex finds the class name, ignoring keywords like 'public' or 'extends'.
+                const nameMatch = classContent.match(/class\s+([a-zA-Z0-9_]+)/);
+                // If a name isn't found, we'll skip creating a broken file tab.
+                if (!nameMatch || !nameMatch[1]) {
+                  return null;
+                }
+                const fileName = `${nameMatch[1]}.java`;
+                return { id: Date.now() + index, name: fileName, content: classContent.trim() };
+              }).filter(Boolean); // Filter out any null entries that may have been created
+              setFiles([mainFile, ...otherFiles]);
+              setActiveFileId(mainFile.id);
+            } else {
+              setFiles([{ ...defaultFile, content: template }]);
+              setActiveFileId(defaultFile.id);
+            }
             setActiveTopic(topic);
             setSelectedTab("code");
             setStdin("");
@@ -630,7 +941,8 @@ public class AddNumbers {
       {
         text: "Clear",
         onPress: () => {
-          setCode("");
+          setFiles([{ ...defaultFile, content: "" }]);
+          setActiveFileId(defaultFile.id);
           setActiveTopic(null);
           setStdin("");
           setOutput("Output will be displayed here");
@@ -640,21 +952,16 @@ public class AddNumbers {
   };
 
   const downloadCode = async () => {
-    if (!code.trim()) {
+    if (!activeFile || !activeFile.content.trim()) {
       Alert.alert("No Code", "There is no code to download.");
       return;
     }
 
     setIsDownloading(true);
-    let fileName = "MyCode.java";
-    const match = code.match(/public class (\w+)/);
-    if (match && match[1]) {
-      fileName = `${match[1]}.java`;
-    }
 
     try {
-      const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
-      await FileSystem.writeAsStringAsync(fileUri, code, {
+      const fileUri = `${FileSystem.cacheDirectory}${activeFile.name}`;
+      await FileSystem.writeAsStringAsync(fileUri, activeFile.content, {
         encoding: 'utf8',
       });
 
@@ -695,23 +1002,48 @@ public class AddNumbers {
 
   return (
     <>
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalView}>
+            <Text style={styles.modalText}>Enter New File Name</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="e.g., Person.java"
+              value={newFileName}
+              onChangeText={setNewFileName}
+              autoFocus={true}
+            />
+            <View style={styles.modalButtonContainer}>
+              <Pressable style={[styles.modalButton, styles.buttonClose]} onPress={() => setModalVisible(false)}>
+                <Text style={styles.textStyle}>Cancel</Text>
+              </Pressable>
+              <Pressable style={[styles.modalButton, styles.buttonCreate]} onPress={addFile} disabled={!newFileName.trim()}>
+                <Text style={styles.textStyle}>Create</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
       <Stack.Screen options={{ headerShown: false }} />
       <KeyboardAvoidingView
         style={styles.container}
-        behavior={Platform.OS === "ios" ? "padding" : "padding"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : -150}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
+        {/* The main container for all screen content */}
         <View style={styles.container}>
-          <View style={styles.header}>
-            <FontAwesome5 style={styles.icon} name="code" size={24} color="white" />
+          <View style={[styles.header, { flexDirection: 'row', alignItems: 'center' }]}>
+            <FontAwesome5 style={styles.icon} name="code" size={24} color="white" marginTop={10} />
             <Text style={styles.headerText}>JAVA IDE & CHECKLIST</Text>
           </View>
 
           <View style={styles.fileNameContainer}>
-            <TouchableOpacity style={styles.addButton} onPress={clearCode}>
-              <FontAwesome5 name="trash" size={16} color="white" />
-            </TouchableOpacity>
-            <TouchableOpacity
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <TouchableOpacity
               style={[styles.addButton, { marginLeft: 5 }]}
               onPress={downloadCode}
               disabled={isDownloading}
@@ -719,19 +1051,21 @@ public class AddNumbers {
               {isDownloading ? <ActivityIndicator size="small" color="white" /> : <FontAwesome5 name="download" size={16} color="white" />}
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.runButton, { marginLeft: 5, paddingHorizontal: 15 }]}
-              onPress={() => runCode()}
-              disabled={isRunning}
-            >
-              <Text style={styles.runButtonText}>{isRunning ? "RUNNING..." : "RUN"}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
+              <TouchableOpacity
               style={[styles.testButton, { marginLeft: 5 }]}
               onPress={testConnection}
               disabled={isRunning}
             >
               <FontAwesome5 name="wifi" size={12} color="white" />
+            </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.runButton, { paddingHorizontal: 20 }]}
+              onPress={() => runCode()}
+              disabled={isRunning}
+            >
+              <Text style={styles.runButtonText}>{isRunning ? "RUNNING..." : "RUN"}</Text>
             </TouchableOpacity>
           </View>
 
@@ -750,15 +1084,39 @@ public class AddNumbers {
           <View style={styles.contentContainer}> 
             {selectedTab === "code" && ( 
               <View style={{ flex: 1 }}>
+                <View style={styles.fileTabsContainer}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+                    {files.map(file => (
+                      <TouchableOpacity 
+                        key={file.id}
+                        style={[styles.fileTab, activeFileId === file.id && styles.activeFileTab]}
+                        onPress={() => setActiveFileId(file.id)}
+                      >
+                        <Text style={[styles.fileTabText, activeFileId === file.id && styles.activeFileTabText]}>{file.name}</Text>
+                        {activeFileId === file.id && (
+                          <TouchableOpacity 
+                            style={styles.closeFileButton} 
+                            onPress={() => handleDeleteOrClearFile(file)}>
+                            <FontAwesome5 name="trash-alt" size={12} color="#666" />
+                          </TouchableOpacity>
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                    <TouchableOpacity style={styles.addFileButton} onPress={() => setModalVisible(true)}>
+                      <FontAwesome5 name="plus" size={14} color="#046a38" />
+                    </TouchableOpacity>
+                  </ScrollView>
+                </View>
+
                 <ScrollView style={{ flex: 1 }} nestedScrollEnabled={true}>
                   <TextInput
                     style={styles.codeInput}
                     multiline
-                    value={code}
-                    onChangeText={setCode}
+                    value={activeFile?.content || ""}
+                    onChangeText={handleFileContentChange}
                     placeholder="Write your Java code here..."
                     placeholderTextColor="#888"
-                    scrollEnabled={false}
+                    scrollEnabled={false} // Important for nested scroll
                   />
                 </ScrollView>
                 {showInputPanel && (
